@@ -3,8 +3,9 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.db.models import Post
+from app.db.model import Post
 
 
 class PostRepository:
@@ -34,7 +35,9 @@ class PostRepository:
     
     async def get_one(self) -> Post | None:
         result = await self.db.execute(
-            select(Post)
+            select(Post).options(
+                selectinload(Post.media),
+            )
             .where(Post.is_active == True)
             .where(Post.status == PostStatus.published)
             .limit(1)
@@ -42,16 +45,35 @@ class PostRepository:
 
         return result.scalar_one_or_none()
     
-    async def list(
+    async def list_all_posts(
         self,
         limit: int = 20,
         offset: int = 0,
     ):
         result = await self.db.execute(
             select(Post)
+            .options(
+                selectinload(Post.media),
+            )
             .offset(offset)
             .limit(limit)
         )
 
         return result.scalars().all()
+
+
+
+    async def posts_by_ids(
+            self,
+            post_ids: list[UUID],
+        ):
+            result = await self.db.execute(
+                select(Post)
+                .options(
+                    selectinload(Post.media),
+                )
+                .where(Post.id.in_(post_ids))
+            )
+    
+            return result.scalars().all()
     

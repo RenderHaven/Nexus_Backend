@@ -6,7 +6,7 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://user:password@localhost:5432/feed_builder_test"
     )
     DB_ECHO: bool = True
-
+    REDIS_URL: str = "redis://localhost:6379"
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
