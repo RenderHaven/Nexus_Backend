@@ -1,4 +1,3 @@
-from app.schemas.schemas import PoolPost
 from app.db.model import PostStatus
 from uuid import UUID
 

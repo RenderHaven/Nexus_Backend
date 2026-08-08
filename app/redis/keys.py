@@ -11,3 +11,11 @@ class RedisKeys:
     @staticmethod
     def popular_feed():
         return f"feed:popular"
+    
+    @staticmethod
+    def pool(pool_name:str,category_id:str='all'):
+        return f"pool:{pool_name}:{category_id}"
+    
+    @staticmethod
+    def category(category_id:str='all'):
+        return f"categories:{category_id}"

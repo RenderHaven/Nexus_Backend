@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 from app.db.model import MediaType
 
 
-class PostMediaResponse(BaseModel):
+class PostMedia(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -15,43 +15,47 @@ class PostMediaResponse(BaseModel):
     position: int
 
 
-class UserMiniResponse(BaseModel):
+class UserMini(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     username: str
 
 
-class CategoryMiniResponse(BaseModel):
+class Category(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     name: str
 
 
-class PostResponse(BaseModel):
+class PostSmall(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    created_at: datetime
+    category_id:UUID
+
+    engagement_score: float
+    is_active: bool
+
+class Post(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+
     title: str | None
     body: str | None
 
     engagement_score: int
-    # likes: int
-    # comments: int
-    # shares: int
 
     created_at: datetime
 
     user_id: UUID
     category_id: UUID
-    media: list[PostMediaResponse]
 
-class PoolPost(BaseModel):
+    media: list[PostMedia]
+
+class Feed(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    created_at: datetime
-
-    engagement_score: float
-    is_active: bool
+    posts: dict[str, dict[str,list[Post]]]

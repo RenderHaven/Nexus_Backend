@@ -1,0 +1,118 @@
+Enum user_role {
+  admin
+  moderator
+  success_coach
+  student
+  guest
+}
+
+Enum post_status {
+  draft
+  published
+  archived
+  deleted
+}
+
+Enum interaction_type {
+  like
+  comment
+  share
+}
+
+Enum media_type {
+  image
+  video
+  gif
+}
+
+Enum post_interactions_logs_type {
+  created
+  edited
+}
+
+// =========================
+// Tables
+// =========================
+
+Table colleges {
+  id uuid [primary key]
+  name varchar [not null]
+  about text
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+}
+
+Table users {
+  id uuid [primary key]
+  college_id uuid [not null]
+  username varchar [not null]
+  email varchar [not null, unique]
+  password text [not null]
+  role user_role [default: `student`]
+  about text
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+}
+
+Table categories {
+  id uuid [primary key]
+  name varchar [not null, unique]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+}
+
+Table posts {
+  id uuid [primary key]
+  title varchar
+  body text
+  media_urls text
+  user_id uuid [not null]
+  category_id uuid [not null]
+  status post_status [default: `published`]
+  engagement_score integer [default: 0]
+  is_active bool [default: true]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+}
+
+Table post_media {
+  id uuid [primary key]
+  post_id uuid [not null]
+  url text [not null]
+  media_type media_type [not null]
+  position integer [default: 1]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+}
+
+Table post_interactions {
+  id uuid [primary key]
+  post_id uuid [not null]
+  user_id uuid [not null]
+  type interaction_type [not null]
+  body text
+  parent_id uuid
+  is_edited bool [default: false]
+  is_active bool [default: true]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+}
+
+Table post_interactions_logs {
+  id uuid [primary key]
+  post_interaction_id uuid [not null]
+  type post_interactions_logs_type [not null]
+  body text [not null]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+}
+
+// =========================
+// Relationships
+// =========================
+
+Ref: users.college_id > colleges.id
+
+Ref: posts.user_id > users.id
+Ref: posts.category_id > categories.id
+
+Ref: post_media.post_id > posts.id
+
+Ref: post_interactions.post_id > posts.id
+Ref: post_interactions.user_id > users.id
+Ref: post_interactions.parent_id > post_interactions.id
+
+Ref: post_interactions_logs.post_interaction_id > post_interactions.id

@@ -1,3 +1,4 @@
+from app.redis.keys import RedisKeys
 from app.redis.client import get_redis
 from typing import Iterable
 
@@ -9,17 +10,19 @@ class PoolStore:
 
     async def add(
         self,
-        redis_key: str,
+        pool_name:str,
         post_id: str,
         score: float,
+        category_id: str|None=None,
     ) -> None:
         """Add or update a post in the pool."""
-        await self.redis.zadd(redis_key, {post_id: score})
+        await self.redis.zadd(RedisKeys.pool(pool_name,category_id), {post_id: score})
 
     async def add_many(
         self,
-        redis_key: str,
+        pool_name:str,
         posts: Iterable[tuple[str, float]],
+        category_id: str|None=None,
     ) -> None:
         """Bulk add/update posts."""
         mapping = {
@@ -28,28 +31,31 @@ class PoolStore:
         }
 
         if mapping:
-            await self.redis.zadd(redis_key, mapping)
+            await self.redis.zadd(RedisKeys.pool(pool_name,category_id), mapping)
 
     async def top(
         self,
-        redis_key: str,
+        pool_name:str,
+        offset:int = 0,
         limit: int = 20,
+        category_id: str|None=None,
     ) -> list[str]:
         """Get the highest-ranked post ids."""
         return await self.redis.zrevrange(
-            redis_key,
-            0,
-            limit - 1,
+            RedisKeys.pool(pool_name,category_id),
+            offset,
+            limit+offset-1,
         )
 
     async def top_with_scores(
-        self,
-        redis_key: str,
+        self,   
+        pool_name:str,
         limit: int = 20,
+        category_id: str|None=None,
     ) -> list[tuple[str, float]]:
         """Get highest-ranked posts with scores."""
         return await self.redis.zrevrange(
-            redis_key,
+            RedisKeys.pool(pool_name,category_id),
             0,
             limit - 1,
             withscores=True,
@@ -57,25 +63,29 @@ class PoolStore:
 
     async def remove(
         self,
-        redis_key: str,
+        pool_name:str,
         post_id: str,
+        category_id: str|None=None,
     ) -> None:
-        await self.redis.zrem(redis_key, post_id)
+        await self.redis.zrem(RedisKeys.pool(pool_name,category_id), post_id)
 
     async def clear(
         self,
-        redis_key: str,
+        pool_name:str,
+        category_id: str|None=None,
     ) -> None:
-        await self.redis.delete(redis_key)
+        await self.redis.delete(RedisKeys.pool(pool_name,category_id))
 
     async def exists(
         self,
-        redis_key: str,
+        pool_name:str,
+        category_id: str|None=None,
     ) -> bool:
-        return await self.redis.exists(redis_key) > 0
+        return await self.redis.exists(RedisKeys.pool(pool_name,category_id)) > 0
 
     async def size(
         self,
-        redis_key: str,
+        pool_name:str,
+        category_id: str|None=None,
     ) -> int:
-        return await self.redis.zcard(redis_key)
+        return await self.redis.zcard(RedisKeys.pool(pool_name,category_id))

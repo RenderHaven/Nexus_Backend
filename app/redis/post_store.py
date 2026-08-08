@@ -1,5 +1,4 @@
 import json
-from uuid import UUID
 
 from app.redis.client import get_redis
 from app.redis.keys import RedisKeys
@@ -12,18 +11,17 @@ class PostStore:
 
     async def set(
         self,
-        post_id: UUID,
         post: dict,
     ) -> None:
 
         await self.redis.set(
-            RedisKeys.post(str(post_id)),
+            RedisKeys.post(str(post["id"])),
             json.dumps(post),
         )
 
     async def get(
         self,
-        post_id: UUID,
+        post_id: str,
     ) -> dict | None:
 
         data = await self.redis.get(
@@ -37,12 +35,12 @@ class PostStore:
     
     async def get_many(
         self,
-        post_ids: list[UUID],
+        post_ids: list[str],
     ) -> list[dict]:
         if not post_ids:
             return []
             
-        # 1. Convert all UUIDs into their corresponding Redis keys
+        # 1. Convert all strs into their corresponding Redis keys
         keys = [RedisKeys.post(str(pid)) for pid in post_ids]
         
         # 2. Fetch all keys at once using mget
@@ -58,7 +56,6 @@ class PostStore:
 
     async def set_many(
         self,
-        post_ids: list[UUID],
         posts: list[dict],
     ) -> None:
         if not posts:
@@ -76,7 +73,7 @@ class PostStore:
 
     async def delete(
         self,
-        post_id: UUID,
+        post_id: str,
     ):
 
         await self.redis.delete(
