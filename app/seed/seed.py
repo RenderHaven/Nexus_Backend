@@ -12,11 +12,14 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(DATABASE_URL, future=True)
 
-seed_file = "seeds/seed.sql"
+seed_file = Path("seeds/seed.sql")
 
 from app.db.model import Base
 
-Base.metadata.drop_all(engine)
+with engine.begin() as conn:
+    conn.exec_driver_sql("DROP SCHEMA public CASCADE")
+    conn.exec_driver_sql("CREATE SCHEMA public")
+
 Base.metadata.create_all(engine)
 
 with engine.begin() as conn:

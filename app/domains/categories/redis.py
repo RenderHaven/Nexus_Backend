@@ -34,5 +34,3 @@ class CategoryStore:
     async def delete_all_categories(self):
         await self.redis.delete(RedisKeys.category())
     
-
-    

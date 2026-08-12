@@ -130,6 +130,8 @@ class Post(Base):
 
     title = Column(String(255))
     body = Column(Text)
+    like_count=Column(Integer,nullable=False,server_default=text("0"))
+    
 
     user_id = Column(
         UUID(as_uuid=True),
@@ -244,7 +246,7 @@ class PostInteraction(Base):
         index=True,
     )
 
-    interaction_type = Column(
+    type = Column(
         Enum(InteractionType),
         nullable=False,
     )
@@ -291,7 +293,7 @@ class PostInteraction(Base):
 
 
 class PostInteractionLog(Base):
-    __tablename__ = "post_interaction_logs"
+    __tablename__ = "post_interactions_logs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -302,7 +304,7 @@ class PostInteractionLog(Base):
         index=True,
     )
 
-    log_type = Column(
+    type = Column(
         Enum(InteractionLogType),
         nullable=False,
     )

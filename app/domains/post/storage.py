@@ -1,7 +1,7 @@
 from uuid import UUID
 
-from app.db.repositories.post_repo import PostRepository
-from app.redis.post_store import PostStore
+from app.domains.post.repository import PostRepository
+from app.domains.post.redis import PostStore
 from app.schemas.schemas import Post
 
 

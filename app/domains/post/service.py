@@ -1,5 +1,5 @@
 from uuid import UUID
-from app.storage.post import PostStorage
+from app.domains.post.storage import PostStorage
 
 class PostService:
 

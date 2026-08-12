@@ -1,6 +1,5 @@
-from app.api import categories
-from app.db.repositories.feed_repo import FeedRepository
-from app.redis.pool_store import PoolStore
+from app.domains.feed.repository import FeedRepository
+from app.domains.feed.redis import PoolStore
 from collections import defaultdict
 from app.domains.feed.pools.base import BasePool
 

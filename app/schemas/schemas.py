@@ -21,6 +21,14 @@ class UserMini(BaseModel):
     id: UUID
     username: str
 
+class User(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id:UUID
+    username:str
+
+    
+
 
 class Category(BaseModel):
     model_config = ConfigDict(from_attributes=True)
