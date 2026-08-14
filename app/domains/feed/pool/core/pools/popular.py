@@ -1,4 +1,4 @@
-from app.domains.feed.pools.base import BasePool
+from app.domains.feed.pool.core.pools.base import BasePool
 from app.schemas.schemas import PostSmall
 
 

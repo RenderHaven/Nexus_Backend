@@ -31,5 +31,5 @@ class UserStorage:
 
         return user
     
-    async def get_category_preferences(self, user_id: UUID) -> dict[str,int] | None:
+    async def get_category_preferences(self, user_id: UUID) -> dict[str,float] | None:
         return {}

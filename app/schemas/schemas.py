@@ -67,3 +67,4 @@ class Post(BaseModel):
 class Feed(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     posts: dict[str, dict[str,list[Post]]]
+    feed_id:UUID|None=None

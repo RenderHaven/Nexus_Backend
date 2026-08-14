@@ -1,7 +1,7 @@
 from app.domains.feed.repository import FeedRepository
-from app.domains.feed.redis import PoolStore
+from app.domains.feed.pool.redis import PoolStore
 from collections import defaultdict
-from app.domains.feed.pools.base import BasePool
+from app.domains.feed.pool.core.pools.base import BasePool
 
 
 class PoolStorage:
@@ -36,14 +36,13 @@ class PoolStorage:
                 category_id,
             )
     
-    async def get_post_ids_for_category(self,
+    async def get_post_ids(self,
         pool: BasePool,
         category_id: str | None = None,
         offset: int = 0,
         limit:int=10
     ):
         if not await self.pool_store.exists(pool.pool_name,category_id):
-            print("Pool not found, building...")
             await self.build(pool)
         
         post_ids = await self.pool_store.top(
@@ -65,9 +64,10 @@ class PoolStorage:
         categories_probablity:dict[str,(int,float)],
     ):
         post_ids = {}
+        new_offsets={}
         for category_id, (offset,probablity) in categories_probablity.items():
-            post_ids[category_id]= await self.get_post_ids_for_category(
+            post_ids[category_id]= await self.get_post_ids(
                 pool,category_id,offset,int(total_limit*probablity)
             )
-            
-        return post_ids
+            new_offsets[category_id]=offset+len(post_ids[category_id])
+        return post_ids,new_offsets

@@ -19,3 +19,7 @@ class RedisKeys:
     @staticmethod
     def category(category_id:str='all'):
         return f"categories:{category_id}"
+    
+    @staticmethod
+    def feed_snapshot(feed_id:str):
+        return f"feed:snapshot:{feed_id}"

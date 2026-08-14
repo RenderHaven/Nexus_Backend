@@ -1,3 +1,4 @@
+from app.db.model import Category
 from uuid import UUID
 from app.domains.categories.storage import CategoryStorage
 
@@ -7,14 +8,14 @@ class CategoryService:
         self.db=db
         self.category_store=CategoryStorage(db)
         
-    async def get_category(self, category_id:UUID):
+    async def get_category(self, category_id:UUID)->Category | None:
         try:
             category = await self.category_store.get_category(category_id)
             return category
         except Exception as e:
             raise e
     
-    async def get_all_categories(self):
+    async def get_all_categories(self)->list[Category] | None:
         try:
             categories = await self.category_store.get_all_categories()
             return categories

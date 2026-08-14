@@ -15,8 +15,10 @@ class UserService:
         except Exception as e:
             raise e
     
-    async def get_category_preferences(self, user_id:UUID):
+    async def get_category_preferences(self, user_id:UUID|None=None)->dict[str,float]:
         try:
+            if user_id is None:
+                return None
             preferences = await self.user_store.get_category_preferences(user_id)
             return preferences
         except Exception as e:

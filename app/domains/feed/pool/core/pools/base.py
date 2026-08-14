@@ -1,6 +1,5 @@
 from app.schemas.schemas import PostSmall
 from abc import ABC, abstractmethod
-from typing import Any
 
 
 class BasePool(ABC):
