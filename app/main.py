@@ -18,9 +18,8 @@ app.add_middleware(
 
 app.include_router(api_router)
 
-
 @app.get("/")
 async def root():
     return {
-        "message": "Feed Builder API is running"
-    }
+        "message": "Feed Builder API"
+    }  
