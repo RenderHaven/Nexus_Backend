@@ -29,6 +29,11 @@ class PostStorage:
             post.model_dump(mode="json")
         )
 
+        await self.post_store.add_active_post(str(post.id))
+        from app.domains.interaction.storage import InteractionStorage
+        interaction_store = InteractionStorage(self.post_repo.db)
+        await interaction_store._build_redis_for_post(post.id)
+
         return post
 
     async def get_many(self, post_ids: list[UUID]) -> list[Post]:
@@ -57,4 +62,28 @@ class PostStorage:
             ]
         )
 
+        from app.domains.interaction.storage import InteractionStorage
+        interaction_store = InteractionStorage(self.post_repo.db)
+        for post in posts:
+            await self.post_store.add_active_post(str(post.id))
+            await interaction_store._build_redis_for_post(post.id)
+
         return posts
+
+    async def update(self, post) -> Post:
+        db_post = await self.post_repo.update(post)
+        validated = Post.model_validate(db_post)
+        await self.post_store.set(str(validated.id), validated.model_dump(mode="json"))
+        return validated
+
+    async def delete(self, post_id: UUID) -> bool:
+        db_post = await self.post_repo.get_by_id(post_id)
+        if db_post:
+            await self.post_repo.delete(db_post)
+            await self.post_store.delete(str(post_id))
+            await self.post_store.remove_active_post(str(post_id))
+            from app.domains.interaction.storage import InteractionStorage
+            interaction_store = InteractionStorage(self.post_repo.db)
+            await interaction_store.redis_store.redis.delete(interaction_store.redis_store._key(post_id))
+            return True
+        return False

@@ -1,4 +1,7 @@
-from app.auth import get_current_user
+from pydantic import BaseModel
+
+from app.auth import get_current_user, get_current_user_optional
+from app.auth.deps import get_current_user_id_optional
 from app.domains.interaction.service import PostInteractionsService
 from app.domains.comment.service import CommentService
 from uuid import UUID
@@ -10,16 +13,34 @@ from app.domains.post.service import PostService
 from app.db.session import get_db
 router = APIRouter()
 
-
+class PostIDsRequest(BaseModel):
+    post_ids: list[UUID]
+    
 @router.get("/{post_id}",response_model=Post)
-async def get_post(post_id:UUID,db:AsyncSession=Depends(get_db)):
+async def get_post(post_id:UUID,user_id: User | None = Depends(get_current_user_id_optional), db:AsyncSession=Depends(get_db)):
     post_svc = PostService(db)    
-    post = await post_svc.get_post(post_id)
+    post = await post_svc.get_post(post_id, user_id)
     if not post:
         return {
-            "message": "No posts found"
+            "message": "No post found"
         }
     return post
+
+
+
+@router.post("/batch", response_model=list[Post])
+async def get_posts(
+    payload: PostIDsRequest,
+    user_id: User | None = Depends(get_current_user_id_optional),
+    db: AsyncSession = Depends(get_db),
+):
+    post_svc = PostService(db)
+
+    return await post_svc.get_posts(
+        payload.post_ids,
+        user_id,
+    )
+
 
 @router.post("/{post_id}/like")
 async def like_post(post_id:UUID, current_user: User = Depends(get_current_user), db:AsyncSession=Depends(get_db)):

@@ -14,22 +14,22 @@ api_router.include_router(
 )
 
 api_router.include_router(
+    feeds_router,
+    prefix="/feeds",
+    tags=["Feeds"],
+)
+
+api_router.include_router(
     post_router,
     prefix="/posts",
     tags=["Posts"],
 )
 
-api_router.include_router(
-    redis_router,
-    prefix="/redis",
-    tags=["Debug"],
-)
-
-api_router.include_router(
-    feeds_router,
-    prefix="/feeds",
-    tags=["Feeds"],
-)
+# api_router.include_router(
+#     redis_router,
+#     prefix="/redis",
+#     tags=["Debug"],
+# )
 
 api_router.include_router(
     category_router,

@@ -109,7 +109,7 @@ class FeedService:
         for pool_name,ids in post_ids.items():
             for category_id, p_ids in ids.items():
                 if p_ids:
-                    feed_posts[pool_name][str(category_id)] = await self.post_svc.get_posts(p_ids)
+                    feed_posts[pool_name][str(category_id)] = await self.post_svc.get_posts(p_ids, user_id)
                 else:
                     feed_posts[pool_name][str(category_id)] = []
         

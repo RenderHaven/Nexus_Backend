@@ -8,9 +8,6 @@ class RedisKeys:
     def feed(feed_id: str) -> str:
         return f"feed:{feed_id}"
     
-    @staticmethod
-    def popular_feed():
-        return f"feed:popular"
     
     @staticmethod
     def pool(pool_name:str,category_id:str='all'):
@@ -23,3 +20,11 @@ class RedisKeys:
     @staticmethod
     def feed_snapshot(feed_id:str):
         return f"feed:snapshot:{feed_id}"
+
+    @staticmethod
+    def post_likes(post_id: str) -> str:
+        return f"post_likes:{post_id}"
+
+    @staticmethod
+    def active_posts() -> str:
+        return "posts:ids"

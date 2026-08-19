@@ -9,13 +9,34 @@ class PostStore:
     def __init__(self):
         self.redis = get_redis()
 
+    def active_posts_key(self) -> str:
+        return RedisKeys.active_posts()
+
+    async def add_active_post(self, post_id: str):
+        await self.redis.sadd(self.active_posts_key(), post_id)
+
+    async def remove_active_post(self, post_id: str):
+        await self.redis.srem(self.active_posts_key(), post_id)
+
+    async def rebuild_registry(self, post_ids: list[str]):
+        key = self.active_posts_key()
+        temp_key = f"{key}:tmp"
+        pipeline = self.redis.pipeline()
+        if post_ids:
+            pipeline.sadd(temp_key, *post_ids)
+        pipeline.rename(temp_key, key)
+        await pipeline.execute()
+
+    def _key(self, post_id: str) -> str:
+        return RedisKeys.post(post_id)
+
     async def set(
         self,
         post: dict,
     ) -> None:
 
         await self.redis.set(
-            RedisKeys.post(str(post["id"])),
+            self._key(str(post["id"])),
             json.dumps(post),
         )
 
@@ -25,7 +46,7 @@ class PostStore:
     ) -> dict | None:
 
         data = await self.redis.get(
-            RedisKeys.post(str(post_id))
+            self._key(str(post_id))
         )
 
         if data is None:
@@ -41,7 +62,7 @@ class PostStore:
             return []
             
         # 1. Convert all strs into their corresponding Redis keys
-        keys = [RedisKeys.post(str(pid)) for pid in post_ids]
+        keys = [self._key(str(pid)) for pid in post_ids]
         
         # 2. Fetch all keys at once using mget
         data = await self.redis.mget(keys)
@@ -63,7 +84,7 @@ class PostStore:
             
         # 1. Create a dictionary mapping of "Redis Key" -> "JSON String"
         mapping = {
-            RedisKeys.post(str(post["id"])): json.dumps(post)
+            self._key(str(post["id"])): json.dumps(post)
             for post in posts
         }
         
@@ -77,5 +98,5 @@ class PostStore:
     ):
 
         await self.redis.delete(
-            RedisKeys.post(str(post_id))
+            self._key(str(post_id))
         )

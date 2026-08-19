@@ -1,9 +1,12 @@
+from app.auth.deps import get_current_user_id_optional
 from app.domains.feed.feed_snapshot.service import FeedSnapshotService
 from app.schemas.schemas import Feed
 from uuid import UUID
 from fastapi import APIRouter,Depends
 from app.db.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.auth import get_current_user_optional
+from app.db.model import User
 from app.domains.feed.service import FeedService
 router = APIRouter()
 
@@ -28,13 +31,11 @@ async def delete_feed_snapshot(
 
 @router.get("/posts",response_model=Feed)
 async def get_pool_posts(
-    user_id:str|None=None,
+    user_id: User | None = Depends(get_current_user_id_optional),
     feed_id:UUID|None=None,
     db: AsyncSession = Depends(get_db),
 ):
     feed_svc = FeedService(db)
-    if user_id is not None:
-        user_id = UUID(user_id)
     post_ids,feed_id = await feed_svc.get_posts(user_id,feed_id)
     if not post_ids:
         return {
@@ -44,14 +45,12 @@ async def get_pool_posts(
     return {"posts": post_ids,"feed_id":feed_id}
 
 @router.get("/post_ids")
-async def get_pool_posts(
-    user_id:str|None=None,
+async def get_pool_posts_ids(
+    user_id: User | None = Depends(get_current_user_id_optional),
     feed_id:UUID|None=None,
     db: AsyncSession = Depends(get_db),
 ):
     feed_svc = FeedService(db)
-    if user_id is not None:
-        user_id = UUID(user_id)
     post_ids,feed_id = await feed_svc.get_post_ids(user_id,feed_id)
     if not post_ids:
         return {

@@ -63,6 +63,9 @@ class Post(BaseModel):
     category_id: UUID
 
     media: list[PostMedia]
+    
+    like_count: int = 0
+    is_liked: bool | None = None
 
 class Feed(BaseModel):
     model_config = ConfigDict(from_attributes=True)

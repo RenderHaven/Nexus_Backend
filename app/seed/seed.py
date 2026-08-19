@@ -12,7 +12,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(DATABASE_URL, future=True)
 
-seed_file = Path("seeds/seed.sql")
+seed_file = Path("seeds/seed_v2.sql")
 
 from app.db.model import Base
 
