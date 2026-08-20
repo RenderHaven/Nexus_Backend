@@ -1,86 +1,110 @@
 from uuid import UUID
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.model import PostInteraction, InteractionType
+from app.db.model import PostComment, CommentEditLog, Post
+
 
 class CommentRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_by_id(self, post_interaction_id: UUID) -> PostInteraction | None:
-        return await self.db.get(PostInteraction, post_interaction_id)
-
-    async def add_comment(self, post_id: UUID, user_id: UUID, comment: str):
-        post_interaction = PostInteraction(
-            post_id=post_id,
-            user_id=user_id,
-            type=InteractionType.comment,
-            body=comment,
-            is_active=True
+    async def get_by_id(self, comment_id: UUID) -> PostComment | None:
+        result = await self.db.execute(
+            select(PostComment).where(PostComment.id == comment_id)
         )
-        self.db.add(post_interaction)
-        await self.db.commit()
-        await self.db.refresh(post_interaction)
-        return post_interaction
+        return result.scalar_one_or_none()
 
-    async def add_comment_reply(self, user_id: UUID, post_interaction_id: UUID, comment: str):
-        parent_post_interaction = await self.get_by_id(post_interaction_id)
-        if not parent_post_interaction:
-            raise Exception("Parent post interaction not found")
-        post_id = parent_post_interaction.post_id
-        if not parent_post_interaction.type == InteractionType.comment:
-            raise Exception("Parent post interaction is not a comment")
-        if not parent_post_interaction.is_active:
-            raise Exception("Parent post interaction is not active")
-
-        post_interaction = PostInteraction(
+    async def add_comment(self, post_id: UUID, user_id: UUID, comment: str) -> PostComment:
+        post_comment = PostComment(
             post_id=post_id,
             user_id=user_id,
             body=comment,
-            parent_id=post_interaction_id,
-            type=InteractionType.comment,
             is_active=True
         )
-        self.db.add(post_interaction)
-        await self.db.commit()
-        await self.db.refresh(post_interaction)
-        return post_interaction
-
-    async def edit_comment(self, user_id: UUID, post_interaction_id: UUID, comment: str):
-        post_interaction = await self.get_by_id(post_interaction_id)
-        if not post_interaction:
-            raise Exception("Post interaction not found")
-        if not post_interaction.type == InteractionType.comment:
-            raise Exception("Post interaction is not a comment")
-        if not post_interaction.user_id == user_id:
-            raise Exception("Post interaction is not owned by the user")
-        if not post_interaction.is_active:
-            raise Exception("Post interaction is not active")
-        await self.delete(post_interaction_id)
-        new_post_interaction = await self.add_comment(post_interaction.post_id, post_interaction.user_id, comment)
-        return new_post_interaction
-
-    async def delete(self, post_interaction_id: UUID) -> bool:
+        self.db.add(post_comment)
         await self.db.execute(
-            update(PostInteraction)
-            .where(PostInteraction.id == post_interaction_id)
-            .values(is_active=False)
+            update(Post)
+            .where(Post.id == post_id)
+            .values(comment_count=Post.comment_count + 1)
         )
         await self.db.commit()
-        return True
+        await self.db.refresh(post_comment)
+        return post_comment
 
-    async def get_by_post_id(self, post_id: UUID) -> list[PostInteraction]:
-        result = await self.db.execute(
-            select(PostInteraction)
-            .where(PostInteraction.post_id == post_id)
-            .where(PostInteraction.type == InteractionType.comment)
-        )
-        return result.scalars().all()
+    async def add_comment_reply(self, user_id: UUID, comment_id: UUID, comment: str) -> PostComment:
+        parent_comment = await self.get_by_id(comment_id)
+        if not parent_comment:
+            raise Exception("Parent comment not found")
+        if not parent_comment.is_active:
+            raise Exception("Parent comment is not active")
 
-    async def get_replies_by_parent_id(self, post_interaction_id: UUID) -> list[PostInteraction]:
-        result = await self.db.execute(
-            select(PostInteraction)
-            .where(PostInteraction.parent_id == post_interaction_id)
-            .where(PostInteraction.type == InteractionType.comment)
+        post_id = parent_comment.post_id
+        reply_comment = PostComment(
+            post_id=post_id,
+            user_id=user_id,
+            body=comment,
+            parent_id=comment_id,
+            is_active=True
         )
-        return result.scalars().all()
+        self.db.add(reply_comment)
+        await self.db.execute(
+            update(Post)
+            .where(Post.id == post_id)
+            .values(comment_count=Post.comment_count + 1)
+        )
+        await self.db.commit()
+        await self.db.refresh(reply_comment)
+        return reply_comment
+
+    async def edit_comment(self, user_id: UUID, comment_id: UUID, comment: str) -> PostComment:
+        post_comment = await self.get_by_id(comment_id)
+        if not post_comment:
+            raise Exception("Comment not found")
+        if not post_comment.user_id == user_id:
+            raise Exception("Comment is not owned by the user")
+        if not post_comment.is_active:
+            raise Exception("Comment is not active")
+
+        # Record edit log
+        edit_log = CommentEditLog(
+            comment_id=comment_id,
+            previous_body=post_comment.body,
+        )
+        self.db.add(edit_log)
+
+        post_comment.body = comment
+        post_comment.is_edited = True
+        self.db.add(post_comment)
+        await self.db.commit()
+        await self.db.refresh(post_comment)
+        return post_comment
+
+    async def delete(self, comment_id: UUID) -> bool:
+        post_comment = await self.get_by_id(comment_id)
+        if post_comment and post_comment.is_active:
+            post_comment.is_active = False
+            self.db.add(post_comment)
+            await self.db.execute(
+                update(Post)
+                .where(Post.id == post_comment.post_id)
+                .values(comment_count=func.greatest(0, Post.comment_count - 1))
+            )
+            await self.db.commit()
+            return True
+        return False
+
+    async def get_by_post_id(self, post_id: UUID) -> list[PostComment]:
+        result = await self.db.execute(
+            select(PostComment)
+            .where(PostComment.post_id == post_id)
+            .where(PostComment.is_active == True)
+        )
+        return list(result.scalars().all())
+
+    async def get_replies_by_parent_id(self, comment_id: UUID) -> list[PostComment]:
+        result = await self.db.execute(
+            select(PostComment)
+            .where(PostComment.parent_id == comment_id)
+            .where(PostComment.is_active == True)
+        )
+        return list(result.scalars().all())

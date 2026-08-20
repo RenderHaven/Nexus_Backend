@@ -1,11 +1,8 @@
-from app.db.model import PostStatus
-from uuid import UUID
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.model import Post
+from app.db.model import Post, PostStatus
 
 
 class FeedRepository:
@@ -16,11 +13,11 @@ class FeedRepository:
         result = await self.db.execute(
             select(Post)
             .where(Post.is_active == True)
+            .where(Post.status == PostStatus.published)
             .order_by(
                 Post.engagement_score.desc(),
                 Post.created_at.desc(),
             )
             .limit(limit)
         )
-
-        return result.scalars().all()
+        return list(result.scalars().all())

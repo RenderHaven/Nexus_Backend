@@ -32,12 +32,19 @@ class PostStore:
 
     async def set(
         self,
-        post: dict,
+        post: dict | str,
+        post_data: dict | None = None,
     ) -> None:
+        if isinstance(post, dict):
+            pdict = post
+        else:
+            pdict = post_data or {}
+            if "id" not in pdict and post:
+                pdict["id"] = post
 
         await self.redis.set(
-            self._key(str(post["id"])),
-            json.dumps(post),
+            self._key(str(pdict["id"])),
+            json.dumps(pdict),
         )
 
     async def get(

@@ -43,13 +43,11 @@ class PostInteractionsService:
 
     async def build(self):
         from sqlalchemy import select
-        from app.db.model import PostInteraction, InteractionType
-        
+        from app.db.model import PostReaction
+
         print("Starting Interaction Redis build...")
         result = await self.db.execute(
-            select(PostInteraction.post_id, PostInteraction.user_id)
-            .where(PostInteraction.type == InteractionType.like)
-            .where(PostInteraction.is_active == True)
+            select(PostReaction.post_id, PostReaction.user_id)
         )
         active_likes = result.fetchall()
 

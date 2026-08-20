@@ -12,6 +12,7 @@ class PostStorage:
         self.post_repo = PostRepository(db)
 
     async def get(self, post_id: UUID) -> Post | None:
+        print("hii")
         post = await self.post_store.get(str(post_id))
 
         if post:
