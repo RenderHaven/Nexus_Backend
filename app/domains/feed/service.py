@@ -1,116 +1,181 @@
-
-import random as random
-from app.domains.feed.utils import get_snapshot_key
-from app.domains.feed.feed_snapshot.service import FeedSnapshotService
-from app.domains.feed.feed_snapshot.domain import FeedSnapshot
-from app.domains.categories.service import CategoryService
-from app.domains.feed.pool.core.pools.base import BasePool
+import random
 from collections import defaultdict
 from uuid import UUID
-from app.domains.feed.pool.core.pools.popular import PopularPool
-from app.domains.feed.pool.storage import PoolStorage
+
+from app.domains.categories.service import CategoryService
+from app.domains.cursor.domain import PoolGroupCursor
+from app.domains.cursor.service import CursorService
+from app.domains.feed.pools.popular import PopularPool
+from app.domains.feed.repository import FeedRepository
+from app.domains.pool.core.base_pool import BasePool
+from app.domains.pool.core.pool_group import PoolGroup
+from app.domains.pool.service import PoolService
 from app.domains.post.service import PostService
 from app.domains.user.service import UserService
 
 class FeedService:
 
     def __init__(self, db):
-        self.feed_size=100
-        self.post_svc=PostService(db)
-        self.user_svc=UserService(db)
-        self.feed_snapshot_svc=FeedSnapshotService()
-        self.category_svc=CategoryService(db)
-        self.pool_storage=PoolStorage(db)
-        self.pools = {
-            "popular": PopularPool(pool_probablity=50),
-        }
-    
-    async def _feed_snapshot(self,feed_id:UUID|None=None):
-        snapshot=await self.feed_snapshot_svc.get_snapshot(feed_id)
-        return snapshot
+        self.feed_size = 100
 
-    async def get_feed_snapshot(self,feed_id:UUID|None=None):
-        return await self._feed_snapshot(feed_id)
+        # Services
+        self.post_svc = PostService(db)
+        self.user_svc = UserService(db)
+        self.category_svc = CategoryService(db)
+
+        # Repository
+        self.feed_repo = FeedRepository(db)
+
+        # Pool infrastructure
+        self.pool_service = PoolService()
+
+        # Feed cursor
+        self.cursor_svc = CursorService()
+
+        # Feed groups
+        self.feed_grps: dict[str, BasePool | PoolGroup] = {
+            "popular": PopularPool(db_repo=self.feed_repo),
+        }
+
+    # ------------------------------------------------------------------
+    # Cursor
+    # ------------------------------------------------------------------
+
+    async def _cursor(
+        self,
+        cursor_key: str | None = None,
+    ) -> PoolGroupCursor | None:
+        return await self.cursor_svc.get_pool_group_cursor(cursor_key)
+
+    async def get_feed_cursor(
+        self,
+        cursor_key: str | None = None,
+    ) -> PoolGroupCursor | None:
+        return await self._cursor(cursor_key)
+
+    # ------------------------------------------------------------------
+    # Build pools
+    # ------------------------------------------------------------------
 
     async def build_pools(self):
-        for pool in self.pools.values():
-            await self.pool_storage.build(pool)
-    
-    async def _get_offsets(self,feed_snapshot:FeedSnapshot|None,pool_name:str,category_id:str|None=None):
-        if feed_snapshot and feed_snapshot.offsets is not None:
-            key=get_snapshot_key(pool_name,category_id)
-            return feed_snapshot.offsets.get(key,0)
-        return 0
-                
-    
-    async def _get_categories_probablity(self,pool_name:str,feed_snapshot:FeedSnapshot|None,preferences:dict[str,float])->dict[str,(int,float)]:
-        categories_probablity={}
-        for category_id, probablity in preferences.items():
-            offset=await self._get_offsets(feed_snapshot,pool_name,category_id)
-            categories_probablity[category_id]=(offset,probablity)
-        return categories_probablity
+        """
+        Build all feed groups.
+        """
 
-    async def _get_pool_post_ids(self,pool:BasePool,categories_probablity:dict[str,(int,float)],limit:int=100)->dict[str,list[UUID]]:
-        post_ids,new_offsets = await self.pool_storage.get_posts_ids_by_categories(pool,limit,categories_probablity)
-        offsets=defaultdict()
-        for category_id,offset in new_offsets.items():
-            key=get_snapshot_key(pool.pool_name,category_id)
-            offsets[key]=offset
-        return post_ids,offsets
-    
-    async def _get_dummy_preferences(self)->dict[str,float]:
-        categories=await self.category_svc.get_all_categories()
-        
-        preferences={}      # 1/n for all categories
+        for grp in self.feed_grps.values():
+            if isinstance(grp, PoolGroup):
+                for pool_config in grp.pools:
+                    await self.pool_service.build(pool_config.pool)
+            else:
+                await self.pool_service.build(grp)
+
+    def get_feed_groups(self) -> list[str]:
+        """
+        Get all available feed group names.
+        """
+        return list(self.feed_grps.keys())
+
+
+
+    # ------------------------------------------------------------------
+    # Preferences
+    # ------------------------------------------------------------------
+
+    async def _get_dummy_preferences(self) -> dict[str, float]:
+
+        categories = await self.category_svc.get_all_categories()
+
+        preferences = {}
+
         for category in categories:
             preferences[str(category.id)] = random.random()
+
         return preferences
-    
-    async def get_preferences(self,user_id:UUID|None=None)->dict[str,float]:
-        preferences=await self.user_svc.get_category_preferences(user_id)
+
+    async def get_preferences(
+        self,
+        user_id: UUID | None = None,
+    ) -> dict[str, float]:
+
+        preferences = (
+            await self.user_svc.get_category_preferences(
+                user_id
+            )
+        )
 
         if not preferences:
             return await self._get_dummy_preferences()
-        
+
+        print(preferences)
         return preferences
 
-    async def get_post_ids(self,user_id:UUID|None =None,feed_id:UUID|None=None):
-        """Get posts with pools."""
-        feed_post_ids=dict()
+    # ------------------------------------------------------------------
+    # Normal feed IDs
+    # ------------------------------------------------------------------
 
-        ##Prefrence and feed snapshot
-        preferences = await self.get_preferences(user_id)
+    async def get_post_ids(
+        self,
+        grp_name: str="popular",
+        user_id: UUID | None = None,
+        cursor_key: str | None = None,
+    ):
+        """
+        Get post IDs for a feed group.
+        """
 
-        feed_snapshot=await self._feed_snapshot(feed_id)
-
-        # need to apply snapshot for user here
-        new_offsets={}
-        buffer=0
-        for pool in self.pools.values():
-            actual_limit=int(self.feed_size * pool.pool_probablity / 100)
-            extra_limit = buffer*pool.pool_probablity/100
-            limit = int(actual_limit + extra_limit)
-            categories_probablity=await self._get_categories_probablity(pool.pool_name,feed_snapshot,preferences)
-            posts_ids,updated_offsets=await self._get_pool_post_ids(pool,categories_probablity,limit)
-            feed_post_ids[pool.pool_name]=posts_ids
-            new_offsets.update(updated_offsets)
-            
-            if len(posts_ids)<limit:
-                buffer+=(limit-len(posts_ids))
+        feed_grp = self.feed_grps.get(grp_name)
         
-        ##Update feed_snapshot here
-        new_feed_id=await self.feed_snapshot_svc.update_snapshot(user_id,new_offsets,feed_id)
+        if not feed_grp:
+            return [], cursor_key
 
-        return feed_post_ids,new_feed_id
-    
-    async def get_posts(self,user_id:UUID|None =None,feed_id:UUID|None=None):
-        post_ids,feed_id=await self.get_post_ids(user_id,feed_id)
-        feed_posts=defaultdict(dict)
-        for pool_name,ids in post_ids.items():
-            for category_id, p_ids in ids.items():
-                if p_ids:
-                    feed_posts[pool_name][str(category_id)] = await self.post_svc.get_posts(p_ids, user_id)
-                else:
-                    feed_posts[pool_name][str(category_id)] = []
+        feed_cursor = await self._cursor(cursor_key)
+
+        feed_offsets = feed_cursor.offsets if feed_cursor else {}
+
+        post_ids, new_offsets = await self.pool_service.get_post_ids(
+            group_or_pool=feed_grp,
+            limit=self.feed_size,
+            offsets=feed_offsets,
+        )
         
-        return feed_posts,feed_id
+        feed_offsets.update(new_offsets)
+
+        new_cursor_key = (
+            await self.cursor_svc.update_pool_group_cursor(
+                user_id,
+                feed_offsets,
+                cursor_key,
+            )
+        )
+
+        return post_ids, new_cursor_key
+
+    # ------------------------------------------------------------------
+    # Normal feed posts
+    # ------------------------------------------------------------------
+
+    async def get_posts(
+        self,
+        grp_name: str,
+        user_id: UUID | None = None,
+        cursor_key: str | None = None,
+    ):
+        """
+        Get hydrated posts from the normal feed.
+        """
+
+        post_ids, new_cursor_key = await self.get_post_ids(
+            grp_name,
+            user_id,
+            cursor_key,
+        )
+
+        if not post_ids:
+            return [], new_cursor_key
+
+        posts = await self.post_svc.get_posts(
+            post_ids,
+            user_id,
+        )
+
+        return posts, new_cursor_key

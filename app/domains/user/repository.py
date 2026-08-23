@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.model import User, AlumniProfile, UserInterest, UserOpenTo, UserBadge
+from app.db.model import User, UserInterest, UserOpenTo, UserBadge
 
 
 class UserRepository:
@@ -13,8 +13,7 @@ class UserRepository:
     def _user_options(self):
         return [
             selectinload(User.college),
-            selectinload(User.alumni_profile),
-            selectinload(User.interests),
+            selectinload(User.interests).selectinload(UserInterest.category),
             selectinload(User.open_to),
             selectinload(User.badges).selectinload(UserBadge.badge),
         ]

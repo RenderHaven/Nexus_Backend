@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "positions": {
+    "table-colleges": {
+      "x": 2360.667117504221,
+      "y": 1989.704765839119
+    },
+    "table-users": {
+      "x": 1386.110504604366,
+      "y": 1445.5593502652155
+    },
+    "table-categories": {
+      "x": 1103.0837895608934,
+      "y": 1715.8309037130168
+    },
+    "table-user_interests": {
+      "x": 0,
+      "y": 946
+    },
+    "table-user_open_to": {
+      "x": 250,
+      "y": 961
+    },
+    "table-posts": {
+      "x": 2394.25,
+      "y": 736
+    },
+    "table-post_media": {
+      "x": 232.343072942165,
+      "y": 286.77722328761286
+    },
+    "table-collaboration_responses": {
+      "x": 3794.25,
+      "y": 383
+    },
+    "table-event_attendees": {
+      "x": 576.436672242671,
+      "y": 496.84596263955166
+    },
+    "table-opportunity_clicks": {
+      "x": 1903.8330309782955,
+      "y": 470.65877309564013
+    },
+    "table-post_reactions": {
+      "x": 2305.7559201782697,
+      "y": 378.0459927434791
+    },
+    "table-post_comments": {
+      "x": 2641.012598939138,
+      "y": 323.1379782304372
+    },
+    "table-comment_edit_logs": {
+      "x": 3078.75,
+      "y": 30
+    },
+    "table-moderation_logs": {
+      "x": 2925.6906497347845,
+      "y": 318.4599274347908
+    },
+    "table-chat_rooms": {
+      "x": 3205.25,
+      "y": 398
+    },
+    "table-chat_participants": {
+      "x": 3902.75,
+      "y": 0
+    },
+    "table-messages": {
+      "x": 385,
+      "y": 0
+    },
+    "table-support_conversations": {
+      "x": 3609.5,
+      "y": 939.3946569913055
+    },
+    "table-support_messages": {
+      "x": 3485.25,
+      "y": 383
+    },
+    "table-badges": {
+      "x": 554.75,
+      "y": 1554
+    },
+    "table-user_badges": {
+      "x": 612.25,
+      "y": 946
+    },
+    "table-campus_ambassadors": {
+      "x": 862.25,
+      "y": 916
+    },
+    "table-activity_log": {
+      "x": 1115.25,
+      "y": 856
+    },
+    "table-user_category_probability": {
+      "x": 1365.25,
+      "y": 931
+    },
+    "table-college_category_probability": {
+      "x": 1639.25,
+      "y": 931
+    },
+    "table-notifications": {
+      "x": 1965.25,
+      "y": 901
+    }
+  }
+}

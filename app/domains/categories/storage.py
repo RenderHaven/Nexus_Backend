@@ -14,6 +14,8 @@ class CategoryStorage:
             if not categories:
                 db_categories = await self.category_repo.get_all()
                 categories=[Category.model_validate(db_cat) for db_cat in db_categories]
+                for cat in categories: 
+                    await self.category_store.set_category(cat.id,cat.model_dump_json())
                 await self.category_store.set_all_categories([cat.model_dump(mode="json") for cat in categories])
             else:
                 categories=[Category.model_validate(cat) for cat in categories]

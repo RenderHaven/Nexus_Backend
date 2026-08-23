@@ -1,6 +1,7 @@
 from datetime import datetime, date
+from typing import Any
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.db.model import (
     UserRole,
@@ -8,11 +9,13 @@ from app.db.model import (
     PostType,
     PostStatus,
     ModerationStatus,
+    ModerationAction,
     ReactionType,
     MediaType,
-    CollaborationStatus,
+    ActionStatus,
     CollaborationResponseStatus,
-    OpportunityType,
+    ConversationStatus,
+    MessageType,
 )
 
 
@@ -25,55 +28,22 @@ class PostMedia(BaseModel):
     position: int
 
 
-class AchievementDetailSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    post_id: UUID
-    story: str
-    struggle: str
-    lesson: str | None = None
-    resources: str | None = None
-    open_to_collaborate: bool = False
+class StudentProfile(BaseModel):
+    course: str | None = None
+    year_of_study: int | None = None
+    about: str | None = None
+    goals: str | None = None
 
 
-class KnowledgeDetailSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    post_id: UUID
-    hook: str
-    substance: str
-    resources: str | None = None
-
-
-class CollaborationDetailSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    post_id: UUID
-    looking_for: str
-    status: CollaborationStatus = CollaborationStatus.open
-
-
-class EventDetailSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    post_id: UUID
-    event_date: datetime
-    open_to_all: bool = True
-    restricted_to_college_id: UUID | None = None
-    registration_url: str | None = None
-
-
-class OpportunityDetailSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    post_id: UUID
-    organisation: str
-    opportunity_type: OpportunityType
-    eligibility: str | None = None
-    any_branch_welcome: bool = True
-    deadline: date
-    external_url: str
-    posted_by: UUID
+class AlumniProfile(BaseModel):
+    course: str | None = None
+    about: str | None = None
+    goals: str | None = None
+    graduation_year: int | None = None
+    industry: str | None = None
+    current_role: str | None = None
+    current_company: str | None = None
+    open_to_mentoring: bool = False
 
 
 class UserMini(BaseModel):
@@ -91,21 +61,19 @@ class User(BaseModel):
     username: str
     email: str | None = None
     role: UserRole = UserRole.student
-    course: str | None = None
-    year_of_study: int | None = None
-    about: str | None = None
-    goals: str | None = None
+    is_alumni: bool = False
     total_xp: int = 0
     current_level: IdentityLevel = IdentityLevel.spark
-    is_alumni: bool = False
+    profile: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime | None = None
+
 
 class Author(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id:UUID
-    college_id:UUID | None = None
-    username:str
-    role:UserRole=UserRole.student
+    id: UUID
+    college_id: UUID | None = None
+    username: str
+    role: UserRole = UserRole.student
 
 
 class Category(BaseModel):
@@ -115,12 +83,45 @@ class Category(BaseModel):
     name: str
 
 
+class College(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    about: str | None = None
+    created_at: datetime | None = None
+
+
+class UserInterest(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_id: UUID
+    category_id: UUID
+    created_at: datetime | None = None
+    category: Category | None = None
+
+
+class UserOpenTo(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_id: UUID
+    label: str
+
+
+class PostResource(BaseModel):
+    title: str
+    link: str
+
+
 class PostSmall(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     created_at: datetime
     category_id: UUID
+    like_count:UUID
     engagement_score: float
     is_active: bool
 
@@ -134,7 +135,14 @@ class Post(BaseModel):
     category_id: UUID
     type: PostType = PostType.spark
     title: str | None = None
-    body: str | None = None
+    content: str
+
+    # 4 extra nullable columns
+    date_at: datetime | None = None
+    restricted_to_college_id: UUID | None = None
+    resources: list[PostResource] | list[dict[str, Any]] | None = None
+    action_status: ActionStatus | None = None
+
     status: PostStatus = PostStatus.published
     moderation_status: ModerationStatus = ModerationStatus.pending
     reviewed_by: UUID | None = None
@@ -146,18 +154,183 @@ class Post(BaseModel):
     engagement_score: float = 0.0
     is_active: bool = True
     created_at: datetime
-    author:Author | None=None
-    media: list[PostMedia] = []
-    achievement_details: AchievementDetailSchema | None = None
-    knowledge_details: KnowledgeDetailSchema | None = None
-    collaboration_details: CollaborationDetailSchema | None = None
-    event_details: EventDetailSchema | None = None
-    opportunity_details: OpportunityDetailSchema | None = None
+    author: Author | None = None
+    category: Category | None = None
+    college: College | None = None
+    media: list[PostMedia] = Field(default_factory=list)
 
     is_liked: bool | None = None
 
 
+class PostCreate(BaseModel):
+    user_id: UUID
+    college_id: UUID
+    category_id: UUID
+    type: PostType
+    title: str | None = None
+    content: str
+    date_at: datetime | None = None
+    restricted_to_college_id: UUID | None = None
+    resources: list[PostResource] | None = None
+    action_status: ActionStatus | None = None
+
+
+class PostUpdate(BaseModel):
+    category_id: UUID | None = None
+    type: PostType | None = None
+    title: str | None = None
+    content: str | None = None
+    date_at: datetime | None = None
+    restricted_to_college_id: UUID | None = None
+    resources: list[PostResource] | None = None
+    action_status: ActionStatus | None = None
+    status: PostStatus | None = None
+    moderation_status: ModerationStatus | None = None
+    is_active: bool | None = None
+
+
+class CollaborationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    post_id: UUID
+    user_id: UUID
+    status: CollaborationResponseStatus = CollaborationResponseStatus.interested
+    created_at: datetime | None = None
+
+
+class EventAttendee(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    post_id: UUID
+    user_id: UUID
+    registered_at: datetime | None = None
+    attended_at: datetime | None = None
+
+
+class OpportunityClick(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    post_id: UUID
+    user_id: UUID
+    clicked_at: datetime | None = None
+
+
+class PostReaction(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    post_id: UUID
+    user_id: UUID
+    type: ReactionType
+    created_at: datetime | None = None
+
+
+class PostComment(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    post_id: UUID
+    user_id: UUID
+    body: str
+    parent_id: UUID | None = None
+    is_edited: bool = False
+    is_active: bool = True
+    created_at: datetime | None = None
+
+
+class ModerationLog(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    post_id: UUID
+    coach_id: UUID
+    action: ModerationAction
+    note: str | None = None
+    created_at: datetime | None = None
+
+
+class ChatRoom(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    post_id: UUID
+    status: ConversationStatus = ConversationStatus.active
+    created_at: datetime | None = None
+
+
+class ChatParticipant(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    chat_room_id: UUID
+    user_id: UUID
+    collaboration_response_id: UUID
+    last_read_at: datetime | None = None
+    joined_at: datetime | None = None
+
+
+class Message(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    chat_room_id: UUID
+    sender_id: UUID
+    body: str | None = None
+    type: MessageType = MessageType.text
+    created_at: datetime | None = None
+
+
+class ActivityLog(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: UUID
+    college_id: UUID
+    action_type: str
+    entity_type: str | None = None
+    entity_id: UUID | None = None
+    category_id: UUID | None = None
+    xp_awarded: int = 0
+    metadata: dict[str, Any] | None = Field(
+        default=None,
+        validation_alias=AliasChoices("metadata", "meta_data"),
+    )
+    created_at: datetime | None = None
+
+
+class CategoryProbability(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    category_id: UUID
+    probability: float
+    updated_at: datetime | None = None
+
+
+class UserCategoryProbability(CategoryProbability):
+    user_id: UUID
+
+
+class CollegeCategoryProbability(CategoryProbability):
+    college_id: UUID
+
+
+class Notification(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_id: UUID
+    type: str
+    entity_type: str | None = None
+    entity_id: UUID | None = None
+    is_read: bool = False
+    created_at: datetime | None = None
+
+
 class Feed(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    posts: dict[str, dict[str, list[Post]]]
-    feed_id: UUID | None = None
+    posts: list[Post]
+    cursor_key: str | None = None

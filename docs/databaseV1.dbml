@@ -1,12 +1,7 @@
 // =========================================================
-// NIAT Nexus — Database Schema v5
-// Single flat posts table. No per-type detail tables.
-// Every type-specific need is covered by 4 extra nullable
-// columns on posts itself: date_at, restricted_to_college_id,
-// resources, action_status. Everything else (organisation,
-// eligibility, hook, looking_for, etc.) is written into content
-// as prose, not a queryable column.
-// Relationships, workflow state, and counters/logs stay relational.
+// NIAT Nexus — Database Schema v2
+// Builds on the v1 model: adds post-type polymorphism,
+// moderation, points/XP, gated messaging, activity log.
 // =========================================================
 
 // =========================
@@ -71,10 +66,7 @@ Enum media_type {
   gif
 }
 
-// whether the action on this post is still available: collaboration
-// still recruiting, event registration still open, opportunity still
-// accepting applications. null for types with no action (knowledge, spark, achievement).
-Enum action_status {
+Enum collaboration_status {
   open
   closed
 }
@@ -96,6 +88,14 @@ Enum message_type {
   file
 }
 
+Enum opportunity_type {
+  internship
+  competition
+  research
+  fellowship
+  scholarship
+}
+
 // =========================
 // Core: colleges, users, categories
 // =========================
@@ -114,13 +114,26 @@ Table users {
   email varchar [not null, unique]
   password text [not null]
   role user_role [default: `student`]
-  is_alumni bool [default: false]
+  course varchar
+  year_of_study integer
+  about text
+  goals text
   total_xp integer [default: 0]
   current_level identity_level [default: `spark`]
-  profile jsonb [not null, default: `'{}'`]
+  is_alumni bool [default: false]
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
 
-  Note: "total_xp/current_level are the cached nightly rollup of activity_log.xp_awarded, never write directly. Kept as real columns since leaderboard/ambassador queries sort on them. profile jsonb shape depends on is_alumni: student = {course, year_of_study, about, goals}; alumni = {course?, about, goals?, graduation_year, industry, current_role, current_company, open_to_mentoring}."
+  Note: 'total_xp/current_level are the cached, nightly-aggregated rollup of activity_log.xp_awarded — never write to these directly from the app.'
+}
+
+Table alumni_profiles {
+  user_id uuid [primary key]
+  graduation_year integer
+  industry varchar
+  current_role varchar
+  current_company varchar
+  open_to_mentoring bool [default: false]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
 }
 
 Table categories {
@@ -129,8 +142,7 @@ Table categories {
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
 }
 
-// what a student is interested in / open to — powers feed personalisation.
-// stays relational: needs joins against categories + probability tables.
+// what a student is interested in / open to — powers feed personalisation
 Table user_interests {
   id uuid [primary key]
   user_id uuid [not null]
@@ -145,7 +157,7 @@ Table user_open_to {
 }
 
 // =========================
-// Posts — single flat table, no per-type detail tables
+// Posts — core table + one detail table per type
 // =========================
 
 Table posts {
@@ -155,14 +167,7 @@ Table posts {
   category_id uuid [not null]
   type post_type [not null]
   title varchar
-  content text [not null]
-
-  // --- the only 4 extra columns, shared across whichever types need them ---
-  date_at timestamp // opportunity: application deadline. event: when it happens.
-  restricted_to_college_id uuid // null = open to all colleges. set = restricted to that one college. used by event, opportunity.
-  resources jsonb // list of {title, link}. knowledge's shared links, and also opportunity/event's apply/register links — no separate url column, just another entry in this list.
-  action_status action_status // collaboration: still recruiting. event: registration still open. opportunity: still accepting applications. null for knowledge/spark/achievement.
-
+  body text
   status post_status [default: `published`]
   moderation_status moderation_status [default: `pending`]
   reviewed_by uuid
@@ -176,7 +181,7 @@ Table posts {
   is_active bool [default: true]
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
 
-  Note: "title + content cover every type on their own (achievement and spark need nothing else). organisation, eligibility, hook, and looking_for are written into content as prose, not stored as separate columns. date_at, restricted_to_college_id, resources, and action_status are the only 4 extra columns, reused across whichever types need them, all nullable so a post only fills in what its type actually uses. engagement_score and the *_count fields are cached counters kept in sync by interaction consumers, then mirrored into the Redis ZSET used by feed_builder. category_id + created_at are what the Redis sorted-set pool groups/sorts by."
+  Note: 'engagement_score, *_count are cached counters kept in sync by the interaction consumers (see whiteboard: comments/likes/retweet weighting), then mirrored into the Redis ZSET used by feed_builder. category_id + created_at are what the Redis sorted-set pool groups/sorts by.'
 }
 
 Table post_media {
@@ -188,10 +193,39 @@ Table post_media {
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
 }
 
-// =========================
-// Collaboration workflow — stays relational (response tracking,
-// gates chat access; not just descriptive content)
-// =========================
+// --- Achievement post ---
+Table achievement_details {
+  post_id uuid [primary key]
+  story text [not null]
+  struggle text [not null]
+  lesson text
+  resources text
+  open_to_collaborate bool [default: false]
+}
+
+// --- Knowledge post (3-layer structure) ---
+// Table knowledge_details {
+//   post_id uuid [primary key]
+//   hook text [not null]
+//   substance text [not null]
+//   resources text
+// }
+
+// Table knowledge_saves {
+//   id uuid [primary key]
+//   post_id uuid [not null]
+//   user_id uuid [not null]
+//   created_at timestamp [default: `CURRENT_TIMESTAMP`]
+
+//   Note: 'unique(post_id, user_id) — powers "saved by 25+ students" multiplier XP and Knowledge Sharer badge.'
+// }
+
+// --- Collaboration request ---
+Table collaboration_details {
+  post_id uuid [primary key]
+  looking_for text [not null] // plain-language description of who's needed
+  status collaboration_status [default: `open`]
+}
 
 Table collaboration_responses {
   id uuid [primary key]
@@ -200,12 +234,17 @@ Table collaboration_responses {
   status collaboration_response_status [default: `interested`]
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
 
-  Note: "An accepted response is what opens a conversation (see chat_participants.collaboration_response_id)."
+  Note: 'An accepted response is what opens a conversation (see conversations.collaboration_response_id).'
 }
 
-// =========================
-// Event / opportunity engagement — stays relational
-// =========================
+// --- Event ---
+Table event_details {
+  post_id uuid [primary key]
+  event_date timestamp [not null]
+  open_to_all bool [default: true]
+  restricted_to_college_id uuid
+  registration_url text
+}
 
 Table event_attendees {
   id uuid [primary key]
@@ -215,12 +254,26 @@ Table event_attendees {
   attended_at timestamp
 }
 
+// --- Opportunity ---
+Table opportunity_details {
+  post_id uuid [primary key]
+  organisation varchar [not null]
+  opportunity_type opportunity_type [not null]
+  eligibility text
+  any_branch_welcome bool [default: true]
+  deadline date [not null]
+  external_url text [not null]
+  posted_by uuid [not null] // success coach / admin; students can only suggest
+}
+
 Table opportunity_clicks {
   id uuid [primary key]
   post_id uuid [not null]
   user_id uuid [not null]
   clicked_at timestamp [default: `CURRENT_TIMESTAMP`]
 }
+
+// spark posts use only the core `posts` table (title/body), no detail table
 
 // =========================
 // Reactions & comments
@@ -233,7 +286,7 @@ Table post_reactions {
   type reaction_type [not null]
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
 
-  Note: "unique(post_id, user_id) — one reaction per user per post, can be changed. Rate-limited to 20/day at the app layer."
+  Note: 'unique(post_id, user_id) — one reaction per user per post, can be changed. Rate-limited to 20/day at the app layer.'
 }
 
 Table post_comments {
@@ -266,7 +319,7 @@ Table moderation_logs {
   note text
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
 
-  Note: "Every approve/hold/remove decision, for coach accountability (PRD 8.5 Coach actions log)."
+  Note: 'Every approve/hold/remove decision, for coach accountability (PRD 8.5 "Coach actions log").'
 }
 
 // =========================
@@ -280,7 +333,7 @@ Table chat_rooms {
   status conversation_status [default: `active`]
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
 
-  Note: "One room per collaboration post. Mirrors thread status to posts.action_status (active while open/still forming, closed once wrapped)."
+  Note: 'One room per collaboration post. Mirrors thread status to collaboration_details.status (active while open/still forming, closed once wrapped).'
 }
 
 Table chat_participants {
@@ -291,7 +344,7 @@ Table chat_participants {
   last_read_at timestamp
   joined_at timestamp [default: `CURRENT_TIMESTAMP`]
 
-  Note: "unique(chat_room_id, user_id). A row can only be inserted here if collaboration_response_id points to a response with status = accepted — a user cannot be a participant without having gone through the collaboration flow. Every accepted responder gets their own row, tied to their own response, all pointing at the same chat_room."
+  Note: 'unique(chat_room_id, user_id). A row can only be inserted here if collaboration_response_id points to a response with status = accepted — a user cannot be a participant without having gone through the collaboration flow. This is what makes group formation work: every accepted responder gets their own row, tied to their own response, all pointing at the same chat_room.'
 }
 
 Table messages {
@@ -344,7 +397,7 @@ Table campus_ambassadors {
   reason_note text
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
 
-  Note: "unique(college_id, week_start_date). Calculated Sunday night, announced Monday digest."
+  Note: 'unique(college_id, week_start_date). Calculated Sunday night, announced Monday digest.'
 }
 
 // =========================
@@ -363,7 +416,7 @@ Table activity_log {
   metadata jsonb
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
 
-  Note: "MUST be range-partitioned by created_at (quarterly: activity_log_2026_q1, _q2, ...) from day one, PRD 7.5 flags this as a day-one decision not a retrofit. Detailed rows kept ~30 days hot per the points log spec, then rolled into users.total_xp and archived to S3 per the hot/warm/cold tiers. Doubles as the XP ledger and the source for coach dashboard signals + non-academic data export."
+  Note: 'MUST be range-partitioned by created_at (quarterly: activity_log_2026_q1, _q2, ...) from day one — PRD 7.5 flags this as a day-one decision, not a retrofit. Detailed rows kept ~30 days hot per the points log spec, then rolled into users.total_xp and archived to S3 per the hot/warm/cold tiers in the diagram. Doubles as the XP ledger and the source for coach dashboard signals + non-academic data export.'
 }
 
 // =========================
@@ -385,7 +438,7 @@ Table college_category_probability {
   probability float [not null]
   updated_at timestamp [default: `CURRENT_TIMESTAMP`]
 
-  Note: "user_category_probability and college_category_probability are combined (w1*x1 + w2*x2, per whiteboard) by the Preference Engine to rank category probability for a user, feeds the Redis-side post-pool grouping."
+  Note: 'user_category_probability and college_category_probability are combined (w1*x1 + w2*x2, per whiteboard) by the Preference Engine to rank Category_probability for a user — feeds the Redis-side redish_Posts_pool grouping.'
 }
 
 // =========================
@@ -407,6 +460,7 @@ Table notifications {
 // =========================
 
 Ref: users.college_id > colleges.id
+Ref: alumni_profiles.user_id - users.id
 Ref: user_interests.user_id > users.id
 Ref: user_interests.category_id > categories.id
 Ref: user_open_to.user_id > users.id
@@ -415,15 +469,24 @@ Ref: posts.user_id > users.id
 Ref: posts.college_id > colleges.id
 Ref: posts.category_id > categories.id
 Ref: posts.reviewed_by > users.id
-Ref: posts.restricted_to_college_id > colleges.id
 Ref: post_media.post_id > posts.id
 
+Ref: achievement_details.post_id - posts.id
+// Ref: knowledge_details.post_id - posts.id
+// Ref: knowledge_saves.post_id > posts.id
+// Ref: knowledge_saves.user_id > users.id
+
+Ref: collaboration_details.post_id - posts.id
 Ref: collaboration_responses.post_id > posts.id
 Ref: collaboration_responses.user_id > users.id
 
+Ref: event_details.post_id - posts.id
+Ref: event_details.restricted_to_college_id > colleges.id
 Ref: event_attendees.post_id > posts.id
 Ref: event_attendees.user_id > users.id
 
+Ref: opportunity_details.post_id - posts.id
+Ref: opportunity_details.posted_by > users.id
 Ref: opportunity_clicks.post_id > posts.id
 Ref: opportunity_clicks.user_id > users.id
 

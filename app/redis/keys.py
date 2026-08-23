@@ -3,28 +3,43 @@ class RedisKeys:
     @staticmethod
     def post(post_id: str) -> str:
         return f"post:{post_id}"
+
+    @staticmethod
+    def post_likes(post_id: str) -> str:
+        return f"post:likes:{post_id}"
     
     @staticmethod
     def feed(feed_id: str) -> str:
         return f"feed:{feed_id}"
     
-    
     @staticmethod
-    def pool(pool_name:str,category_id:str='all'):
-        return f"pool:{pool_name}:{category_id}"
+    def pool(pool_name:str):
+        return f"feed:{pool_name}"
     
     @staticmethod
     def category(category_id:str='all'):
-        return f"categories:{category_id}"
-    
-    @staticmethod
-    def feed_snapshot(feed_id:str):
-        return f"feed:snapshot:{feed_id}"
+        return f"category:{category_id}"
 
     @staticmethod
-    def post_likes(post_id: str) -> str:
-        return f"post_likes:{post_id}"
+    def college(college_id: str = "all") -> str:
+        return f"college:{college_id}"
+
+    @staticmethod
+    def user(user_id: str = "all") -> str:
+        return f"user:{user_id}"
+
+    @staticmethod
+    def user_profile(user_id: str) -> str:
+        return f"user:profile:{user_id}"
+    
+    @staticmethod
+    def pool_cursor(id: str) -> str:
+        return f"pool:cursor:{id}"
+
+    @staticmethod
+    def pool_group_cursor(id: str) -> str:
+        return f"pool_group:cursor:{id}"
 
     @staticmethod
     def active_posts() -> str:
-        return "posts:ids"
+        return "post:all"

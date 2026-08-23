@@ -5,6 +5,8 @@ from app.auth.deps import get_current_user_id_optional
 from app.domains.interaction.service import PostInteractionsService
 from app.domains.comment.service import CommentService
 from uuid import UUID
+from app.domains.post_type.enum import PostType
+from app.domains.post_type.service import PostTypeService
 from app.schemas.schemas import Post
 from app.db.model import User
 from fastapi import APIRouter, Depends
@@ -25,7 +27,6 @@ async def get_post(post_id:UUID,user_id: User | None = Depends(get_current_user_
             "message": "No post found"
         }
     return post
-
 
 
 @router.post("/batch", response_model=list[Post])
@@ -121,3 +122,32 @@ async def delete_comment(comment_id:UUID,current_user: User = Depends(get_curren
         "post_interaction": result
     }
 
+
+@router.get("/type/{post_type}/post_ids")
+async def get_type_post_ids(
+    post_type: PostType,
+    user_id: User | None = Depends(
+        get_current_user_id_optional
+    ),
+    cursor_key: str | None = None,
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+):
+    post_type_svc = PostTypeService(db)
+
+    post_ids, cursor_key = await post_type_svc.get_type_post_ids(
+        post_type=post_type,
+        user_id=user_id,
+        cursor_key=cursor_key,
+        limit=limit,
+    )
+
+    if not post_ids:
+        return {
+            "message": "No post ids found"
+        }
+
+    return {
+        "posts": post_ids,
+        "cursor_key": cursor_key,
+    }

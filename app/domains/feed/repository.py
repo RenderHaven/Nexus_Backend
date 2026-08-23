@@ -21,3 +21,6 @@ class FeedRepository:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+
+    

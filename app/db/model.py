@@ -12,10 +12,11 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
-    JSON,
     String,
     Text,
+    UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import declarative_base, relationship
@@ -85,7 +86,7 @@ class MediaType(str, enum.Enum):
     gif = "gif"
 
 
-class CollaborationStatus(str, enum.Enum):
+class ActionStatus(str, enum.Enum):
     open = "open"
     closed = "closed"
 
@@ -107,20 +108,9 @@ class MessageType(str, enum.Enum):
     file = "file"
 
 
-class OpportunityType(str, enum.Enum):
-    internship = "internship"
-    competition = "competition"
-    research = "research"
-    fellowship = "fellowship"
-    scholarship = "scholarship"
-
-
-# Legacy InteractionType for backward compatibility
-class InteractionType(str, enum.Enum):
-    like = "like"
-    comment = "comment"
-    view = "view"
-    share = "share"
+# Legacy aliases for backward compatibility
+InteractionType = ReactionType
+CollaborationStatus = ActionStatus
 
 
 # =========================
@@ -147,17 +137,13 @@ class User(Base):
     email = Column(String(255), nullable=False, unique=True, index=True)
     password = Column(Text, nullable=False)
     role = Column(Enum(UserRole, name="user_role"), nullable=False, server_default=UserRole.student.value, default=UserRole.student)
-    course = Column(String(100), nullable=True)
-    year_of_study = Column(Integer, nullable=True)
-    about = Column(Text, nullable=True)
-    goals = Column(Text, nullable=True)
+    is_alumni = Column(Boolean, nullable=False, server_default="false", default=False)
     total_xp = Column(Integer, nullable=False, server_default="0", default=0)
     current_level = Column(Enum(IdentityLevel, name="identity_level"), nullable=False, server_default=IdentityLevel.spark.value, default=IdentityLevel.spark)
-    is_alumni = Column(Boolean, nullable=False, server_default="false", default=False)
+    profile = Column(JSONB, nullable=False, server_default=text("'{}'::jsonb"), default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     college = relationship("College", back_populates="users")
-    alumni_profile = relationship("AlumniProfile", uselist=False, back_populates="user")
     interests = relationship("UserInterest", back_populates="user", cascade="all, delete-orphan")
     open_to = relationship("UserOpenTo", back_populates="user", cascade="all, delete-orphan")
     posts = relationship("Post", foreign_keys="[Post.user_id]", back_populates="author")
@@ -165,20 +151,6 @@ class User(Base):
     reactions = relationship("PostReaction", back_populates="user", cascade="all, delete-orphan")
     comments = relationship("PostComment", back_populates="user", cascade="all, delete-orphan")
     badges = relationship("UserBadge", back_populates="user", cascade="all, delete-orphan")
-
-
-class AlumniProfile(Base):
-    __tablename__ = "alumni_profiles"
-
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
-    graduation_year = Column(Integer, nullable=False)
-    industry = Column(String(100), nullable=True)
-    current_role = Column(String(100), nullable=True)
-    current_company = Column(String(100), nullable=True)
-    open_to_mentoring = Column(Boolean, nullable=False, server_default="false", default=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-    user = relationship("User", back_populates="alumni_profile")
 
 
 class Category(Base):
@@ -193,6 +165,9 @@ class Category(Base):
 
 class UserInterest(Base):
     __tablename__ = "user_interests"
+    __table_args__ = (
+        UniqueConstraint("user_id", "category_id", name="uq_user_interests_user_category"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -222,31 +197,35 @@ class Post(Base):
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False, index=True)
     type = Column(Enum(PostType, name="post_type"), nullable=False)
     title = Column(String(255), nullable=True)
-    body = Column(Text, nullable=True)
+    content = Column(Text, nullable=False)
+
+    # 4 extra nullable columns shared across types
+    date_at = Column(DateTime(timezone=True), nullable=True)
+    restricted_to_college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=True)
+    resources = Column(JSONB, nullable=True)
+    action_status = Column(Enum(ActionStatus, name="action_status"), nullable=True)
+
     status = Column(Enum(PostStatus, name="post_status"), nullable=False, server_default=PostStatus.published.value, default=PostStatus.published, index=True)
     moderation_status = Column(Enum(ModerationStatus, name="moderation_status"), nullable=False, server_default=ModerationStatus.pending.value, default=ModerationStatus.pending)
     reviewed_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
+
     like_count = Column(Integer, nullable=False, server_default="0", default=0)
     comment_count = Column(Integer, nullable=False, server_default="0", default=0)
     save_count = Column(Integer, nullable=False, server_default="0", default=0)
     engagement_score = Column(Float, nullable=False, server_default="0.0", default=0.0, index=True)
+
     is_active = Column(Boolean, nullable=False, server_default="true", default=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 
     author = relationship("User", foreign_keys=[user_id], back_populates="posts")
-    college = relationship("College")
+    college = relationship("College", foreign_keys=[college_id])
     category = relationship("Category", back_populates="posts")
     reviewer = relationship("User", foreign_keys=[reviewed_by], back_populates="reviewed_posts")
+    restricted_college = relationship("College", foreign_keys=[restricted_to_college_id])
     media = relationship("PostMedia", back_populates="post", cascade="all, delete-orphan")
-    achievement_details = relationship("AchievementDetail", uselist=False, back_populates="post", cascade="all, delete-orphan")
-    knowledge_details = relationship("KnowledgeDetail", uselist=False, back_populates="post", cascade="all, delete-orphan")
-    knowledge_saves = relationship("KnowledgeSave", back_populates="post", cascade="all, delete-orphan")
-    collaboration_details = relationship("CollaborationDetail", uselist=False, back_populates="post", cascade="all, delete-orphan")
     collaboration_responses = relationship("CollaborationResponse", back_populates="post", cascade="all, delete-orphan")
-    event_details = relationship("EventDetail", uselist=False, back_populates="post", cascade="all, delete-orphan")
     event_attendees = relationship("EventAttendee", back_populates="post", cascade="all, delete-orphan")
-    opportunity_details = relationship("OpportunityDetail", uselist=False, back_populates="post", cascade="all, delete-orphan")
     opportunity_clicks = relationship("OpportunityClick", back_populates="post", cascade="all, delete-orphan")
     reactions = relationship("PostReaction", back_populates="post", cascade="all, delete-orphan")
     comments = relationship("PostComment", back_populates="post", cascade="all, delete-orphan")
@@ -267,52 +246,6 @@ class PostMedia(Base):
     post = relationship("Post", back_populates="media")
 
 
-class AchievementDetail(Base):
-    __tablename__ = "achievement_details"
-
-    post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), primary_key=True)
-    story = Column(Text, nullable=False)
-    struggle = Column(Text, nullable=False)
-    lesson = Column(Text, nullable=True)
-    resources = Column(Text, nullable=True)
-    open_to_collaborate = Column(Boolean, nullable=False, server_default="false", default=False)
-
-    post = relationship("Post", back_populates="achievement_details")
-
-
-class KnowledgeDetail(Base):
-    __tablename__ = "knowledge_details"
-
-    post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), primary_key=True)
-    hook = Column(Text, nullable=False)
-    substance = Column(Text, nullable=False)
-    resources = Column(Text, nullable=True)
-
-    post = relationship("Post", back_populates="knowledge_details")
-
-
-class KnowledgeSave(Base):
-    __tablename__ = "knowledge_saves"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-    post = relationship("Post", back_populates="knowledge_saves")
-    user = relationship("User")
-
-
-class CollaborationDetail(Base):
-    __tablename__ = "collaboration_details"
-
-    post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), primary_key=True)
-    looking_for = Column(Text, nullable=False)
-    status = Column(Enum(CollaborationStatus, name="collaboration_status"), nullable=False, server_default=CollaborationStatus.open.value, default=CollaborationStatus.open)
-
-    post = relationship("Post", back_populates="collaboration_details")
-
-
 class CollaborationResponse(Base):
     __tablename__ = "collaboration_responses"
 
@@ -326,19 +259,6 @@ class CollaborationResponse(Base):
     user = relationship("User")
 
 
-class EventDetail(Base):
-    __tablename__ = "event_details"
-
-    post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), primary_key=True)
-    event_date = Column(DateTime(timezone=True), nullable=False)
-    open_to_all = Column(Boolean, nullable=False, server_default="true", default=True)
-    restricted_to_college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=True)
-    registration_url = Column(Text, nullable=True)
-
-    post = relationship("Post", back_populates="event_details")
-    restricted_college = relationship("College")
-
-
 class EventAttendee(Base):
     __tablename__ = "event_attendees"
 
@@ -350,22 +270,6 @@ class EventAttendee(Base):
 
     post = relationship("Post", back_populates="event_attendees")
     user = relationship("User")
-
-
-class OpportunityDetail(Base):
-    __tablename__ = "opportunity_details"
-
-    post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), primary_key=True)
-    organisation = Column(String(255), nullable=False)
-    opportunity_type = Column(Enum(OpportunityType, name="opportunity_type"), nullable=False)
-    eligibility = Column(Text, nullable=True)
-    any_branch_welcome = Column(Boolean, nullable=False, server_default="true", default=True)
-    deadline = Column(Date, nullable=False)
-    external_url = Column(Text, nullable=False)
-    posted_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-
-    post = relationship("Post", back_populates="opportunity_details")
-    poster = relationship("User", foreign_keys=[posted_by])
 
 
 class OpportunityClick(Base):
@@ -382,6 +286,9 @@ class OpportunityClick(Base):
 
 class PostReaction(Base):
     __tablename__ = "post_reactions"
+    __table_args__ = (
+        UniqueConstraint("post_id", "user_id", name="uq_post_reactions_post_user"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), nullable=False)
@@ -451,6 +358,9 @@ class ChatRoom(Base):
 
 class ChatParticipant(Base):
     __tablename__ = "chat_participants"
+    __table_args__ = (
+        UniqueConstraint("chat_room_id", "user_id", name="uq_chat_participants_room_user"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     chat_room_id = Column(UUID(as_uuid=True), ForeignKey("chat_rooms.id"), nullable=False)
@@ -528,6 +438,9 @@ class UserBadge(Base):
 
 class CampusAmbassador(Base):
     __tablename__ = "campus_ambassadors"
+    __table_args__ = (
+        UniqueConstraint("college_id", "week_start_date", name="uq_campus_ambassadors_college_week"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -552,7 +465,7 @@ class ActivityLog(Base):
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)
     xp_awarded = Column(Integer, nullable=False, server_default="0", default=0)
     meta_data = Column("metadata", JSONB, nullable=True)
-    created_at = Column(DateTime(timezone=True), primary_key=True, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user = relationship("User")
     college = relationship("College")

@@ -16,11 +16,6 @@ class PostRepository:
             selectinload(Post.author),
             selectinload(Post.category),
             selectinload(Post.college),
-            selectinload(Post.achievement_details),
-            selectinload(Post.knowledge_details),
-            selectinload(Post.collaboration_details),
-            selectinload(Post.event_details),
-            selectinload(Post.opportunity_details),
         ]
 
     async def create(self, post: Post) -> Post:
