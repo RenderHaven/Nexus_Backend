@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     KAFKA_COMMENTS_TOPIC: str = "comments_topic"
     REDIS_REBUILD_INTERVAL: str = "6h"
     DB_ECHO: bool = False
+    CURSOR_SECRET_KEY:str= "mDDhpSGJwzSX-YGwr7GzZMCj9icfsGxFdy_RR2esd8w="
 
     model_config = SettingsConfigDict(
         env_file=".env",

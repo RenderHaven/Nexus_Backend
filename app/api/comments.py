@@ -15,7 +15,7 @@ class CommentIDsRequest(BaseModel):
     comment_ids: list[UUID]
 
 
-@router.post("/batch")
+@router.post("/batch",response_model=list[Comment])
 async def get_many_comments(
     payload: CommentIDsRequest,
     db: AsyncSession = Depends(get_db),
@@ -45,6 +45,8 @@ async def get_reply_ids(
 ):
     comment_svc = CommentService(db)
     reply_ids, next_cursor = await comment_svc.get_reply_ids(comment_id, cursor=cursor, limit=limit)
+    if not reply_ids:
+        return {"reply_ids": [], "next_cursor": None}
     return {"reply_ids": reply_ids, "next_cursor": next_cursor}
 
 

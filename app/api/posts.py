@@ -56,6 +56,8 @@ async def get_comment_ids(
 ):
     comment_svc = CommentService(db)
     comment_ids, next_cursor = await comment_svc.get_comment_ids(post_id, cursor=cursor, limit=limit)
+    if not comment_ids:
+        return {"comment_ids": [], "next_cursor": None}
     return {"comment_ids": comment_ids, "next_cursor": next_cursor}
 
 
@@ -124,7 +126,10 @@ async def get_type_post_ids(
         limit=limit,
     )
     if not post_ids:
-        return {"message": "No post ids found"}
+        return {
+            "posts": [],
+            "next_cursor": None,
+        }
     return {
         "posts": post_ids,
         "next_cursor": next_cursor,

@@ -72,7 +72,8 @@ async def get_feed_post_ids(
 
     if not post_ids:
         return {
-            "message": "No post ids found"
+            "posts": [],
+            "next_cursor": None,
         }
 
     return {
