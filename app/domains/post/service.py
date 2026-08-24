@@ -7,19 +7,21 @@ class PostService:
         self.db=db
         self.post_store = PostStorage(db)
 
+    async def _get_interaction(self,post_id:UUID,user_id:UUID|None=None):
+        from app.domains.interaction.storage import InteractionStorage
+        interaction_store = InteractionStorage(self.db)
         
+        like_count = await interaction_store.get_likes_count(post_id)
+        is_liked= await interaction_store.is_liked(post_id=post_id,user_id=user_id)
+        return like_count,is_liked
+
     async def get_post(self, post_id: UUID, user_id: UUID | None = None):
         try:
             post = await self.post_store.get(post_id)
             if not post:
                 return None
-                
-            from app.domains.interaction.storage import InteractionStorage
-            interaction_store = InteractionStorage(self.db)
             
-            post.like_count = await interaction_store.get_likes_count(post.id)
-            if user_id:
-                post.is_liked = await interaction_store.is_liked(post.id, user_id)
+            post.like_count,post.is_liked = await self._get_interaction(post_id=post.id,user_id=user_id)
                 
             return post
         except Exception as e:
@@ -66,7 +68,7 @@ class PostService:
             raise e
 
     async def build_registry(self):
-        from app.db.model import Post, PostStatus
+        from app.db.models import Post, PostStatus
         from sqlalchemy import select
         print("Starting Post Registry build...")
         result = await self.db.execute(

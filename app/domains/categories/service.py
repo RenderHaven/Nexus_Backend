@@ -1,4 +1,4 @@
-from app.db.model import Category
+from app.db.models import Category
 from uuid import UUID
 from app.domains.categories.storage import CategoryStorage
 

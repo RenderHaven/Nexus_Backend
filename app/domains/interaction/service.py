@@ -16,7 +16,7 @@ class PostInteractionsService:
             return await self.post_interaction_store.get_by_id(post_interaction_id)
         except Exception as e:
             raise e
-
+        
     async def like(self, post_id: UUID, user_id: UUID):
         try:
             event = {
@@ -43,7 +43,7 @@ class PostInteractionsService:
 
     async def build(self):
         from sqlalchemy import select
-        from app.db.model import PostReaction
+        from app.db.models import PostReaction
 
         print("Starting Interaction Redis build...")
         result = await self.db.execute(

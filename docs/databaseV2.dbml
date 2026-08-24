@@ -233,55 +233,25 @@ Table post_reactions {
   type reaction_type [not null]
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
 
-  indexes {
-    (post_id, user_id) [unique, name: 'uq_post_reactions_post_user']
-    (post_id, created_at) [name: 'idx_post_reactions_post_created']
-  }
-
-  Note: "One reaction per user per post. Reaction can be changed. Rate-limited to 20/day at the app layer."
+  Note: "unique(post_id, user_id) — one reaction per user per post, can be changed. Rate-limited to 20/day at the app layer."
 }
 
 Table post_comments {
   id uuid [primary key]
   post_id uuid [not null]
   user_id uuid [not null]
-  parent_id uuid
   body text [not null]
-
-  // Denormalized counters for fast reads
-  reply_count int [not null, default: 0]
-  like_count int [not null, default: 0]
-
-  is_edited bool [not null, default: false]
-  is_active bool [not null, default: true]
-
-  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
-  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
-
-  indexes {
-    // Fetch root comments of a post with cursor pagination
-    (post_id, created_at, id) [
-      name: 'idx_comments_post_root_cursor'
-    ]
-
-    // Fetch replies of a comment with cursor pagination
-    (parent_id, created_at, id) [
-      name: 'idx_comments_parent_cursor'
-    ]
-  }
-
-  Note: "parent_id references post_comments.id. NULL parent_id means a top-level comment. reply_count is maintained when replies are created/deleted. Root comments and replies are independently cursor-paginated."
+  parent_id uuid
+  is_edited bool [default: false]
+  is_active bool [default: true]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
 }
 
 Table comment_edit_logs {
   id uuid [primary key]
   comment_id uuid [not null]
   previous_body text [not null]
-  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
-
-  indexes {
-    (comment_id, created_at) [name: 'idx_comment_edit_logs_comment_created']
-  }
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
 }
 
 // =========================

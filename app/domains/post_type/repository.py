@@ -1,6 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.model import Post
+from app.db.models import Post
 
 class PostTypeRepository:
     def __init__(self, db: AsyncSession):

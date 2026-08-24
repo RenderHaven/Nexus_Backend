@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from app.api.posts import router as post_router
+from app.api.comments import router as comments_router
 from app.api.redis import router as redis_router
 from app.api.feeds import router as feeds_router
 from app.api.categories import router as category_router
@@ -30,6 +31,12 @@ api_router.include_router(
     post_router,
     prefix="/posts",
     tags=["Posts"],
+)
+
+api_router.include_router(
+    comments_router,
+    prefix="/comments",
+    tags=["Comments"],
 )
 
 # api_router.include_router(

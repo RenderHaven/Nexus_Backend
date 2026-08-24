@@ -3,7 +3,7 @@ from typing import Any
 from uuid import UUID
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-from app.db.model import (
+from app.db.models import (
     UserRole,
     IdentityLevel,
     PostType,
@@ -236,9 +236,11 @@ class PostComment(BaseModel):
     user_id: UUID
     body: str
     parent_id: UUID | None = None
+    reply_count: int = 0
     is_edited: bool = False
     is_active: bool = True
     created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class ModerationLog(BaseModel):

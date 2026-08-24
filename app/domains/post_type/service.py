@@ -1,5 +1,4 @@
 from uuid import UUID
-from app.domains.cursor.domain import PoolGroupCursor
 from app.domains.cursor.service import CursorService
 from app.domains.post_type.repository import PostTypeRepository
 from app.domains.pool.service import PoolService
@@ -29,8 +28,8 @@ class PostTypeService:
     async def _cursor(
         self,
         cursor_key: str | None = None,
-    ) -> PoolGroupCursor | None:
-        return await self.cursor_svc.get_pool_group_cursor(cursor_key)
+    ) -> dict | None:
+        return await self.cursor_svc.get_cursor(cursor_key)
 
     async def build_pools(self):
         """
@@ -52,7 +51,7 @@ class PostTypeService:
         pool = self.type_pools[post_type]
 
         feed_cursor = await self._cursor(cursor_key)
-        feed_offsets = feed_cursor.offsets if feed_cursor else {}
+        feed_offsets = feed_cursor.get("offsets", {}) if feed_cursor else {}
 
         post_ids, new_offsets = await self.pool_service.get_post_ids(
             group_or_pool=pool,
@@ -63,9 +62,8 @@ class PostTypeService:
         feed_offsets.update(new_offsets)
 
         new_cursor_key = (
-            await self.cursor_svc.update_pool_group_cursor(
-                user_id,
-                feed_offsets,
+            await self.cursor_svc.update_cursor(
+                {"user_id": str(user_id) if user_id else None, "offsets": feed_offsets},
                 cursor_key,
             )
         )

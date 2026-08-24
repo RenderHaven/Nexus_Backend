@@ -3,7 +3,6 @@ from collections import defaultdict
 from uuid import UUID
 
 from app.domains.categories.service import CategoryService
-from app.domains.cursor.domain import PoolGroupCursor
 from app.domains.cursor.service import CursorService
 from app.domains.feed.pools.popular import PopularPool
 from app.domains.feed.repository import FeedRepository
@@ -44,13 +43,13 @@ class FeedService:
     async def _cursor(
         self,
         cursor_key: str | None = None,
-    ) -> PoolGroupCursor | None:
-        return await self.cursor_svc.get_pool_group_cursor(cursor_key)
+    ) -> dict | None:
+        return await self.cursor_svc.get_cursor(cursor_key)
 
     async def get_feed_cursor(
         self,
         cursor_key: str | None = None,
-    ) -> PoolGroupCursor | None:
+    ) -> dict | None:
         return await self._cursor(cursor_key)
 
     # ------------------------------------------------------------------
@@ -130,7 +129,7 @@ class FeedService:
 
         feed_cursor = await self._cursor(cursor_key)
 
-        feed_offsets = feed_cursor.offsets if feed_cursor else {}
+        feed_offsets = feed_cursor.get("offsets", {}) if feed_cursor else {}
 
         post_ids, new_offsets = await self.pool_service.get_post_ids(
             group_or_pool=feed_grp,
@@ -141,9 +140,8 @@ class FeedService:
         feed_offsets.update(new_offsets)
 
         new_cursor_key = (
-            await self.cursor_svc.update_pool_group_cursor(
-                user_id,
-                feed_offsets,
+            await self.cursor_svc.update_cursor(
+                {"user_id": str(user_id) if user_id else None, "offsets": feed_offsets},
                 cursor_key,
             )
         )

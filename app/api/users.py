@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.domains.user.service import UserService
 from app.schemas.schemas import User as UserSchema
 from app.auth.deps import get_current_user
-from app.db.model import User as UserModel
+from app.db.models import User as UserModel
 
 router = APIRouter()
 

@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.interaction.redis import InteractionRedis
 from app.domains.interaction.repository import PostInteractionRepository
-from app.db.model import PostReaction, Post
+from app.db.models import PostReaction, Post
 
 
 class InteractionStorage:

@@ -5,7 +5,7 @@ from sqlalchemy.future import select
 from typing import Any
 
 from app.db.session import get_db
-from app.db.model import User
+from app.db.models  import User
 from app.auth.security import verify_password
 from app.auth.jwt import create_access_token
 from app.auth.schemas import Token

@@ -64,21 +64,19 @@ class PostStore:
     async def get_many(
         self,
         post_ids: list[str],
-    ) -> list[dict]:
+    ) -> list[dict | None]:
         if not post_ids:
             return []
             
-        # 1. Convert all strs into their corresponding Redis keys
         keys = [self._key(str(pid)) for pid in post_ids]
-        
-        # 2. Fetch all keys at once using mget
         data = await self.redis.mget(keys)
         
-        # 3. Parse only the ones that were found in Redis
         posts = []
         for item in data:
             if item is not None:
                 posts.append(json.loads(item))
+            else:
+                posts.append(None)
                 
         return posts
 

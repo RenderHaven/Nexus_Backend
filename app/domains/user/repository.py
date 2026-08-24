@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.model import User, UserInterest, UserOpenTo, UserBadge
+from app.db.models import User, UserInterest, UserOpenTo, UserBadge
 
 
 class UserRepository:

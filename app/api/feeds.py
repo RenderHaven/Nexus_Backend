@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_user_id_optional
-from app.db.model import User
+from app.db.models import User
 from app.db.session import get_db
 from app.domains.cursor.service import CursorService
 from app.domains.feed.service import FeedService
@@ -15,21 +15,21 @@ router = APIRouter()
 
 @router.get("/cursor")
 async def get_feed_cursor(
-    cursor_key: str | None = None,
+    cursor: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     feed_svc = FeedService(db)
 
-    return await feed_svc.get_feed_cursor(cursor_key)
+    return await feed_svc.get_feed_cursor(cursor)
 
 
 @router.post("/delete_cursor")
 async def delete_feed_cursor(
-    cursor_key: str | None = None,
+    cursor: str | None = None,
 ):
     cursor_svc = CursorService()
 
-    await cursor_svc.delete_pool_group_cursor(cursor_key)
+    await cursor_svc.delete_cursor(cursor)
 
     return {
         "message": "Feed cursor deleted"
@@ -59,15 +59,15 @@ async def get_feed_post_ids(
     user_id: User | None = Depends(
         get_current_user_id_optional
     ),
-    cursor_key: str | None = None,
+    cursor: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     feed_svc = FeedService(db)
 
-    post_ids, cursor_key = await feed_svc.get_post_ids(
+    post_ids, next_cursor = await feed_svc.get_post_ids(
         grp_name,
         user_id,
-        cursor_key,
+        cursor,
     )
 
     if not post_ids:
@@ -77,6 +77,6 @@ async def get_feed_post_ids(
 
     return {
         "posts": post_ids,
-        "cursor_key": cursor_key,
+        "next_cursor": next_cursor,
     }
 

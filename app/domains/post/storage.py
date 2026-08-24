@@ -12,7 +12,6 @@ class PostStorage:
         self.post_repo = PostRepository(db)
 
     async def get(self, post_id: UUID) -> Post | None:
-        print("hii")
         post = await self.post_store.get(str(post_id))
 
         if post:
@@ -38,38 +37,42 @@ class PostStorage:
         return post
 
     async def get_many(self, post_ids: list[UUID]) -> list[Post]:
-        posts = await self.post_store.get_many([str(pid) for pid in post_ids])
-
-        if posts:
-            return [
-                Post.model_validate(post)
-                for post in posts
-            ]
-
-        db_posts = await self.post_repo.posts_by_ids(post_ids)
-
-        if not db_posts:
+        if not post_ids:
             return []
 
-        posts = [
-            Post.model_validate(post)
-            for post in db_posts
-        ]
+        cached_items = await self.post_store.get_many([str(pid) for pid in post_ids])
 
-        await self.post_store.set_many(
-            [
-                post.model_dump(mode="json")
-                for post in posts
-            ]
-        )
+        post_map: dict[UUID, dict] = {}
+        missing_ids: list[UUID] = []
 
-        from app.domains.interaction.storage import InteractionStorage
-        interaction_store = InteractionStorage(self.post_repo.db)
-        for post in posts:
-            await self.post_store.add_active_post(str(post.id))
-            await interaction_store._build_redis_for_post(post.id)
+        for pid, item in zip(post_ids, cached_items):
+            if item is not None:
+                post_map[pid] = item
+            else:
+                missing_ids.append(pid)
 
-        return posts
+        if missing_ids:
+            db_posts = await self.post_repo.posts_by_ids(missing_ids)
+            if db_posts:
+                new_posts = [Post.model_validate(p) for p in db_posts]
+                new_dicts = [p.model_dump(mode="json") for p in new_posts]
+
+                await self.post_store.set_many(new_dicts)
+
+                from app.domains.interaction.storage import InteractionStorage
+                interaction_store = InteractionStorage(self.post_repo.db)
+
+                for p in new_posts:
+                    post_map[p.id] = p.model_dump(mode="json")
+                    await self.post_store.add_active_post(str(p.id))
+                    await interaction_store._build_redis_for_post(p.id)
+
+        results = []
+        for pid in post_ids:
+            if pid in post_map:
+                results.append(Post.model_validate(post_map[pid]))
+
+        return results
 
     async def update(self, post) -> Post:
         db_post = await self.post_repo.update(post)

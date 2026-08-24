@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.model import Post, PostStatus
+from app.db.models import Post, PostStatus
 
 
 class FeedRepository:

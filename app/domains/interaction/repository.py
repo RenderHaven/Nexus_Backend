@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.model import PostReaction, Post, ReactionType
+from app.db.models import PostReaction, Post, ReactionType
 
 
 class PostInteractionRepository:

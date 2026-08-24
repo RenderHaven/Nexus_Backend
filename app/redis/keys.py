@@ -6,7 +6,11 @@ class RedisKeys:
 
     @staticmethod
     def post_likes(post_id: str) -> str:
-        return f"post:likes:{post_id}"
+        return f"post:{post_id}:likes"
+
+    @staticmethod
+    def post_comments(post_id: str) -> str:
+        return f"post:{post_id}:comments"
     
     @staticmethod
     def feed(feed_id: str) -> str:
@@ -43,3 +47,13 @@ class RedisKeys:
     @staticmethod
     def active_posts() -> str:
         return "post:all"
+
+    @staticmethod
+    def comment(comment_id: str) -> str:
+        return f"comments:{comment_id}"
+    
+    @staticmethod
+    def comment_replies(comment_id: str) -> str:
+        return f"comments:replies:{comment_id}"
+
+    
