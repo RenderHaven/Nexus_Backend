@@ -1,7 +1,7 @@
 import asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.db.session import engine
-from app.domains.interaction.service import PostInteractionsService
+from app.domains.reaction.service import ReactionService
 from app.domains.feed.service import FeedService
 from app.domains.post.service import PostService
 
@@ -14,7 +14,7 @@ async def rebuild_post_registry():
 async def rebuild_interactions():
     SessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine)
     async with SessionLocal() as db:
-        svc = PostInteractionsService(db)
+        svc = ReactionService(db)
         await svc.build()
 
 async def rebuild_feed_pools():

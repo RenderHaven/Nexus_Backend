@@ -5,8 +5,9 @@ class RedisKeys:
         return f"post:{post_id}"
 
     @staticmethod
-    def post_likes(post_id: str) -> str:
-        return f"post:{post_id}:likes"
+    def user_liked_posts(user_id: str) -> str:
+        return f"user:{user_id}:liked_posts"
+
 
     @staticmethod
     def post_comments(post_id: str) -> str:
@@ -55,5 +56,9 @@ class RedisKeys:
     @staticmethod
     def comment_replies(comment_id: str) -> str:
         return f"comments:replies:{comment_id}"
+
+    @staticmethod
+    def uploading_posts() -> str:
+        return "post:uploading_posts"
 
     

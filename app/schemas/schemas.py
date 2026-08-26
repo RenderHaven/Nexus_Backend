@@ -173,6 +173,7 @@ class PostCreate(BaseModel):
     restricted_to_college_id: UUID | None = None
     resources: list[PostResource] | None = None
     action_status: ActionStatus | None = None
+    media_ids: list[str] = Field(default_factory=list)
 
 
 class PostUpdate(BaseModel):
@@ -187,6 +188,7 @@ class PostUpdate(BaseModel):
     status: PostStatus | None = None
     moderation_status: ModerationStatus | None = None
     is_active: bool | None = None
+    media_ids: list[str] | None = None
 
 
 class CollaborationResponse(BaseModel):

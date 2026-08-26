@@ -111,15 +111,15 @@ class CommentStorage:
 
         return reply_ids
 
-    async def add_comment(self, post_id: UUID, user_id: UUID, body: str) -> Comment:
-        db_comment = await self.repo.add_comment(post_id, user_id, body)
+    async def add_comment(self, post_id: UUID, user_id: UUID, body: str, comment_id: UUID) -> Comment:
+        db_comment = await self.repo.add_comment(post_id, user_id, body, comment_id)
         comment = Comment.model_validate(db_comment)
         await self.redis_store.set_comment(comment.model_dump(mode="json"))
         await self.redis_store.prepend_comment_id(post_id, comment.id)
         return comment
 
-    async def add_comment_reply(self, user_id: UUID, comment_id: UUID, body: str) -> Comment:
-        db_reply = await self.repo.add_comment_reply(user_id, comment_id, body)
+    async def add_comment_reply(self, user_id: UUID, comment_id: UUID, body: str, reply_id: UUID) -> Comment:
+        db_reply = await self.repo.add_comment_reply(user_id, comment_id, body, reply_id)
         reply = Comment.model_validate(db_reply)
         await self.redis_store.set_comment(reply.model_dump(mode="json"))
         await self.redis_store.prepend_reply_id(comment_id, reply.id)
@@ -135,10 +135,10 @@ class CommentStorage:
         await self.redis_store.set_comment(comment.model_dump(mode="json"))
         return comment
 
-    async def delete_comment(self, user_id: UUID, comment_id: UUID) -> bool:
+    async def delete_comment(self, user_id: UUID, comment_id: UUID) -> tuple[bool, UUID | None]:
         comment = await self.get_comment(comment_id)
         if not comment or comment.user_id != user_id:
-            return False
+            return False, None
 
         success = await self.repo.delete(comment_id)
         if success:
@@ -150,4 +150,4 @@ class CommentStorage:
                 if parent_comment:
                     parent_comment.reply_count = max(0, parent_comment.reply_count - 1)
                     await self.redis_store.set_comment(parent_comment.model_dump(mode="json"))
-        return success
+        return success, comment.post_id

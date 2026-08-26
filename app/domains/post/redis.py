@@ -18,6 +18,18 @@ class PostStore:
     async def remove_active_post(self, post_id: str):
         await self.redis.srem(self.active_posts_key(), post_id)
 
+    def uploading_posts_key(self) -> str:
+        return RedisKeys.uploading_posts()
+
+    async def add_uploading_post(self, post_id: str):
+        await self.redis.sadd(self.uploading_posts_key(), post_id)
+
+    async def remove_uploading_post(self, post_id: str):
+        await self.redis.srem(self.uploading_posts_key(), post_id)
+
+    async def is_uploading_post(self, post_id: str) -> bool:
+        return await self.redis.sismember(self.uploading_posts_key(), post_id)
+
     async def rebuild_registry(self, post_ids: list[str]):
         key = self.active_posts_key()
         temp_key = f"{key}:tmp"

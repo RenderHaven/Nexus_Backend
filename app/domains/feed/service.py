@@ -40,17 +40,11 @@ class FeedService:
     # Cursor
     # ------------------------------------------------------------------
 
-    async def _cursor(
-        self,
-        cursor_key: str | None = None,
-    ) -> dict | None:
-        return await self.cursor_svc.get_cursor(cursor_key)
-
     async def get_feed_cursor(
         self,
         cursor_key: str | None = None,
     ) -> dict | None:
-        return await self._cursor(cursor_key)
+        return await self.cursor_svc.get_cursor(cursor_key)
 
     # ------------------------------------------------------------------
     # Build pools
@@ -127,23 +121,13 @@ class FeedService:
         if not feed_grp:
             return [], cursor_key
 
-        feed_cursor = await self._cursor(cursor_key)
+        extra_data = {"user_id": str(user_id)} if user_id else None
 
-        feed_offsets = feed_cursor.get("offsets", {}) if feed_cursor else {}
-
-        post_ids, new_offsets = await self.pool_service.get_post_ids(
+        post_ids, new_cursor_key = await self.pool_service.get_post_ids(
             group_or_pool=feed_grp,
+            cursor_key=cursor_key,
             limit=self.feed_size,
-            offsets=feed_offsets,
-        )
-        
-        feed_offsets.update(new_offsets)
-
-        new_cursor_key = (
-            await self.cursor_svc.update_cursor(
-                {"user_id": str(user_id) if user_id else None, "offsets": feed_offsets},
-                cursor_key,
-            )
+            extra_cursor_data=extra_data
         )
 
         return post_ids, new_cursor_key

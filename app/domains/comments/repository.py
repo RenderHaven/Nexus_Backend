@@ -45,8 +45,10 @@ class CommentRepository:
         post_id: UUID,
         user_id: UUID,
         comment: str,
+        comment_id: UUID,
     ) -> PostComment:
         post_comment = PostComment(
+            id=comment_id,
             post_id=post_id,
             user_id=user_id,
             body=comment,
@@ -54,14 +56,6 @@ class CommentRepository:
         )
 
         self.db.add(post_comment)
-
-        await self.db.execute(
-            update(Post)
-            .where(Post.id == post_id)
-            .values(
-                comment_count=Post.comment_count + 1
-            )
-        )
 
         await self.db.commit()
         await self.db.refresh(post_comment)
@@ -73,6 +67,7 @@ class CommentRepository:
         user_id: UUID,
         comment_id: UUID,
         comment: str,
+        reply_id: UUID,
     ) -> PostComment:
         parent_comment = await self.get_by_id(comment_id)
 
@@ -85,6 +80,7 @@ class CommentRepository:
         post_id = parent_comment.post_id
 
         reply_comment = PostComment(
+            id=reply_id,
             post_id=post_id,
             user_id=user_id,
             body=comment,
@@ -94,14 +90,7 @@ class CommentRepository:
 
         self.db.add(reply_comment)
 
-        # Increment post comment count
-        await self.db.execute(
-            update(Post)
-            .where(Post.id == post_id)
-            .values(
-                comment_count=Post.comment_count + 1
-            )
-        )
+        self.db.add(reply_comment)
 
         # Increment parent's reply count
         await self.db.execute(
@@ -170,17 +159,7 @@ class CommentRepository:
 
         post_comment.is_active = False
 
-        # Decrease post comment count
-        await self.db.execute(
-            update(Post)
-            .where(Post.id == post_comment.post_id)
-            .values(
-                comment_count=func.greatest(
-                    0,
-                    Post.comment_count - 1,
-                )
-            )
-        )
+        post_comment.is_active = False
 
         # If this is a reply, decrease parent's reply count
         if post_comment.parent_id is not None:

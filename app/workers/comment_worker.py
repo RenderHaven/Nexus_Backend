@@ -1,6 +1,8 @@
 import asyncio
 import json
 from aiokafka import AIOKafkaConsumer
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from app.db.session import engine
 from app.config import settings
 
 async def run_comment_worker():
@@ -14,16 +16,19 @@ async def run_comment_worker():
     await consumer.start()
     print("Comment worker started, consuming from", settings.KAFKA_COMMENTS_TOPIC)
 
+    SessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
     try:
-        async for msg in consumer:
-            data = msg.value
-            action = data.get("action")
-            user_id = data.get("user_id")
-            
-            # Here you would invalidate Redis Cache or update Redis keys for the post comments
-            if action in ["comment_added", "reply_added", "comment_edited", "comment_deleted"]:
-                print(f"Processed {action}. Invalidate Redis comment cache here. Forwarding to Preference Engine...")
-                # Note: implement redis cache invalidation logic here
+        while True:
+            batch = await consumer.getmany(timeout_ms=1000, max_records=100)
+            if not batch:
+                continue
+
+            async with SessionLocal() as db:
+                from app.domains.comments.service import CommentService
+                svc = CommentService(db)
+                count = await svc.process_batch(batch)
+                print(f"Processed batch of {count} comment events. DB and Redis updated.")
 
     except Exception as e:
         print(f"Worker Error: {e}")

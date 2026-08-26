@@ -78,53 +78,92 @@ class CommentService:
         )
         return ids, next_cursor
 
-    async def comment(self, post_id: UUID, user_id: UUID, comment: str) -> Comment:
-        result = await self.comment_store.add_comment(post_id, user_id, comment)
-        await kafka_manager.send_event(
-            settings.KAFKA_COMMENTS_TOPIC,
-            {
-                "action": "comment_added",
-                "post_id": str(post_id),
-                "user_id": str(user_id),
-                "comment_id": str(result.id),
-            },
-        )
-        return result
+    async def comment(self, post_id: UUID, user_id: UUID, comment: str) -> dict:
+        import uuid
+        comment_id = uuid.uuid4()
+        event = {
+            "action": "comment_added",
+            "post_id": str(post_id),
+            "user_id": str(user_id),
+            "comment_id": str(comment_id),
+            "comment": comment
+        }
+        await kafka_manager.send_event(settings.KAFKA_COMMENTS_TOPIC, event)
+        return {"status": "event_published", "action": "comment_added", "comment_id": str(comment_id)}
 
-    async def add_comment_reply(self, user_id: UUID, comment_id: UUID, comment: str) -> Comment:
-        result = await self.comment_store.add_comment_reply(user_id, comment_id, comment)
-        await kafka_manager.send_event(
-            settings.KAFKA_COMMENTS_TOPIC,
-            {
-                "action": "reply_added",
-                "parent_id": str(comment_id),
-                "user_id": str(user_id),
-                "comment_id": str(result.id),
-            },
-        )
-        return result
+    async def add_comment_reply(self, user_id: UUID, comment_id: UUID, comment: str) -> dict:
+        import uuid
+        reply_id = uuid.uuid4()
+        event = {
+            "action": "reply_added",
+            "parent_id": str(comment_id),
+            "user_id": str(user_id),
+            "comment_id": str(reply_id),
+            "comment": comment
+        }
+        await kafka_manager.send_event(settings.KAFKA_COMMENTS_TOPIC, event)
+        return {"status": "event_published", "action": "reply_added", "comment_id": str(reply_id)}
 
-    async def edit_comment(self, user_id: UUID, comment_id: UUID, comment: str) -> Comment:
-        result = await self.comment_store.edit_comment(user_id, comment_id, comment)
-        await kafka_manager.send_event(
-            settings.KAFKA_COMMENTS_TOPIC,
-            {
-                "action": "comment_edited",
-                "comment_id": str(comment_id),
-                "user_id": str(user_id),
-            },
-        )
-        return result
+    async def edit_comment(self, user_id: UUID, comment_id: UUID, comment: str) -> dict:
+        event = {
+            "action": "comment_edited",
+            "comment_id": str(comment_id),
+            "user_id": str(user_id),
+            "comment": comment
+        }
+        await kafka_manager.send_event(settings.KAFKA_COMMENTS_TOPIC, event)
+        return {"status": "event_published", "action": "comment_edited", "comment_id": str(comment_id)}
 
-    async def delete(self, user_id: UUID, comment_id: UUID) -> bool:
-        result = await self.comment_store.delete_comment(user_id, comment_id)
-        if result:
-            await kafka_manager.send_event(
-                settings.KAFKA_COMMENTS_TOPIC,
-                {
-                    "action": "comment_deleted",
-                    "comment_id": str(comment_id),
-                    "user_id": str(user_id),
-                },
-            )
-        return result
+    async def delete(self, user_id: UUID, comment_id: UUID) -> dict:
+        event = {
+            "action": "comment_deleted",
+            "comment_id": str(comment_id),
+            "user_id": str(user_id),
+        }
+        await kafka_manager.send_event(settings.KAFKA_COMMENTS_TOPIC, event)
+        return {"status": "event_published", "action": "comment_deleted", "comment_id": str(comment_id)}
+
+    async def process_batch(self, batch_messages):
+        """Process a batch of comment events (DB + Redis update)."""
+        count = 0
+        from collections import defaultdict
+        net_comments = defaultdict(int)
+
+        for tp, messages in batch_messages.items():
+            for msg in messages:
+                data = msg.value
+                action = data.get("action")
+                user_id = UUID(data.get("user_id"))
+
+                if action == "comment_added":
+                    post_id_str = data.get("post_id")
+                    post_id = UUID(post_id_str)
+                    comment_id = UUID(data.get("comment_id"))
+                    comment = data.get("comment")
+                    await self.comment_store.add_comment(post_id, user_id, comment, comment_id)
+                    net_comments[post_id_str] += 1
+                elif action == "reply_added":
+                    parent_id = UUID(data.get("parent_id"))
+                    comment_id = UUID(data.get("comment_id"))
+                    comment = data.get("comment")
+                    reply = await self.comment_store.add_comment_reply(user_id, parent_id, comment, comment_id)
+                    net_comments[str(reply.post_id)] += 1
+                elif action == "comment_edited":
+                    comment_id = UUID(data.get("comment_id"))
+                    comment = data.get("comment")
+                    await self.comment_store.edit_comment(user_id, comment_id, comment)
+                elif action == "comment_deleted":
+                    comment_id = UUID(data.get("comment_id"))
+                    success, post_id = await self.comment_store.delete_comment(user_id, comment_id)
+                    if success and post_id:
+                        net_comments[str(post_id)] -= 1
+                count += 1
+        
+        if net_comments:
+            from app.domains.post.service import PostService
+            post_svc = PostService(self.db)
+            for post_id_str, change in net_comments.items():
+                if change != 0:
+                    await post_svc.post_store.update_comment_count(UUID(post_id_str), change)
+                    
+        return count

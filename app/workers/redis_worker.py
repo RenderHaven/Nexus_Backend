@@ -4,7 +4,7 @@ import subprocess
 import os
 from aiokafka import AIOKafkaConsumer
 from app.config import settings
-from app.domains.interaction.redis import InteractionRedis
+from app.domains.reaction.redis import ReactionRedis
 
 def parse_interval(interval_str: str) -> int:
     """Parse intervals like '6h', '30m', '10s' into seconds."""
@@ -46,7 +46,7 @@ async def run_redis_worker():
     
     await consumer.start()
     print("Redis worker started, consuming from", settings.KAFKA_INTERACTIONS_TOPIC)
-    redis_store = InteractionRedis()
+    redis_store = ReactionRedis()
 
     asyncio.create_task(rebuild_scheduler())
 

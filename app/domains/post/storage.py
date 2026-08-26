@@ -30,9 +30,6 @@ class PostStorage:
         )
 
         await self.post_store.add_active_post(str(post.id))
-        from app.domains.interaction.storage import InteractionStorage
-        interaction_store = InteractionStorage(self.post_repo.db)
-        await interaction_store._build_redis_for_post(post.id)
 
         return post
 
@@ -59,13 +56,9 @@ class PostStorage:
 
                 await self.post_store.set_many(new_dicts)
 
-                from app.domains.interaction.storage import InteractionStorage
-                interaction_store = InteractionStorage(self.post_repo.db)
-
                 for p in new_posts:
                     post_map[p.id] = p.model_dump(mode="json")
                     await self.post_store.add_active_post(str(p.id))
-                    await interaction_store._build_redis_for_post(p.id)
 
         results = []
         for pid in post_ids:
@@ -73,6 +66,13 @@ class PostStorage:
                 results.append(Post.model_validate(post_map[pid]))
 
         return results
+
+    async def add_post(self, post) -> Post:
+        db_post = await self.post_repo.create(post)
+        validated = Post.model_validate(db_post)
+        await self.post_store.set(str(validated.id), validated.model_dump(mode="json"))
+        await self.post_store.add_active_post(str(validated.id))
+        return validated
 
     async def update(self, post) -> Post:
         db_post = await self.post_repo.update(post)
@@ -86,8 +86,39 @@ class PostStorage:
             await self.post_repo.delete(db_post)
             await self.post_store.delete(str(post_id))
             await self.post_store.remove_active_post(str(post_id))
-            from app.domains.interaction.storage import InteractionStorage
-            interaction_store = InteractionStorage(self.post_repo.db)
-            await interaction_store.redis_store.redis.delete(interaction_store.redis_store._key(post_id))
             return True
         return False
+
+    async def update_like_count(self, post_id: UUID, change: int) -> bool:
+        from sqlalchemy import update
+        from app.db.models import Post as DBPost
+        
+        await self.post_repo.db.execute(
+            update(DBPost)
+            .where(DBPost.id == post_id)
+            .values(like_count=DBPost.like_count + change)
+        )
+        await self.post_repo.db.commit()
+
+        cached = await self.post_store.get(str(post_id))
+        if cached:
+            cached['like_count'] = max(0, cached.get('like_count', 0) + change)
+            await self.post_store.set(str(post_id), cached)
+        return True
+
+    async def update_comment_count(self, post_id: UUID, change: int) -> bool:
+        from sqlalchemy import update
+        from app.db.models import Post as DBPost
+        
+        await self.post_repo.db.execute(
+            update(DBPost)
+            .where(DBPost.id == post_id)
+            .values(comment_count=DBPost.comment_count + change)
+        )
+        await self.post_repo.db.commit()
+
+        cached = await self.post_store.get(str(post_id))
+        if cached:
+            cached['comment_count'] = max(0, cached.get('comment_count', 0) + change)
+            await self.post_store.set(str(post_id), cached)
+        return True

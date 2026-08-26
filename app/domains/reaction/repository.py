@@ -43,12 +43,6 @@ class PostInteractionRepository:
                     type=reaction_type,
                 )
                 self.db.add(reaction)
-                # Update like_count on post
-                await self.db.execute(
-                    update(Post)
-                    .where(Post.id == post_id)
-                    .values(like_count=Post.like_count + 1)
-                )
                 if commit:
                     await self.db.commit()
                     await self.db.refresh(reaction)
@@ -56,11 +50,6 @@ class PostInteractionRepository:
         else:
             if reaction:
                 await self.db.delete(reaction)
-                await self.db.execute(
-                    update(Post)
-                    .where(Post.id == post_id)
-                    .values(like_count=func.greatest(0, Post.like_count - 1))
-                )
                 if commit:
                     await self.db.commit()
                 return reaction
@@ -74,11 +63,6 @@ class PostInteractionRepository:
         if reaction:
             post_id = reaction.post_id
             await self.db.delete(reaction)
-            await self.db.execute(
-                update(Post)
-                .where(Post.id == post_id)
-                .values(like_count=func.greatest(0, Post.like_count - 1))
-            )
             await self.db.commit()
             return True
         return False

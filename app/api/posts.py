@@ -8,17 +8,162 @@ from app.auth.deps import get_current_user_id_optional
 from app.db.models import User
 from app.db.session import get_db
 from app.domains.comments.service import CommentService
-from app.domains.interaction.service import PostInteractionsService
+from app.domains.reaction.service import ReactionService
 from app.domains.post.service import PostService
-from app.domains.post_type.enum import PostType
-from app.domains.post_type.service import PostTypeService
+from app.domains.types.enum import PostType
+from app.domains.types.service import PostTypeService
 from app.schemas.schemas import Post
+
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from app.schemas.schemas import PostCreate, PostUpdate, MediaType
+from app.db.models import Post as DBPost, PostMedia as DBPostMedia
+from app.domains.post.service import PostUploadService
 
 router = APIRouter()
 
-
 class PostIDsRequest(BaseModel):
     post_ids: list[UUID]
+
+def create_db_post_from_schema(payload: PostCreate, current_user_id: UUID) -> DBPost:
+    db_post = DBPost(
+        user_id=current_user_id,
+        college_id=payload.college_id,
+        category_id=payload.category_id,
+        type=payload.type,
+        title=payload.title,
+        content=payload.content,
+        date_at=payload.date_at,
+        restricted_to_college_id=payload.restricted_to_college_id,
+        resources=[res.model_dump() for res in payload.resources] if payload.resources else None,
+        action_status=payload.action_status,
+    )
+    if payload.media_ids:
+        for i, media_id in enumerate(payload.media_ids):
+            db_post.media.append(DBPostMedia(url=media_id, media_type=MediaType.image, position=i+1))
+    return db_post
+
+def make_media_permanent_bg(media_ids: list[str]):
+    if not media_ids:
+        return
+    from app.media.service import MediaService
+    MediaService().make_permanent(media_ids)
+
+@router.get("/upload_status/{post_id}")
+async def get_upload_status(post_id: UUID, db: AsyncSession = Depends(get_db)):
+    upload_svc = PostUploadService(db)
+    return await upload_svc.get_upload_status(post_id)
+
+@router.post("/", response_model=Post)
+async def add_post(
+    payload: PostCreate,
+    bg_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    upload_svc = PostUploadService(db)
+    post_svc = PostService(db)
+    
+    db_post = create_db_post_from_schema(payload, current_user.id)
+    
+    # Mark as uploading based on an arbitrary UUID before creation
+    # But we don't have the ID yet unless we generate it
+    import uuid
+    db_post.id = uuid.uuid4()
+    
+    await upload_svc.mark_uploading(db_post.id)
+    
+    try:
+        created_post = await post_svc.add_post(db_post)
+        if payload.media_ids:
+            bg_tasks.add_task(make_media_permanent_bg, payload.media_ids)
+        return created_post
+    finally:
+        await upload_svc.mark_completed(db_post.id)
+
+@router.post("/events", response_model=Post)
+async def add_event(
+    payload: PostCreate,
+    bg_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role.value not in ["admin", "success_coach"]:
+        raise HTTPException(status_code=403, detail="Not authorized to create events")
+    payload.type = PostType.event
+    return await add_post(payload, bg_tasks, current_user, db)
+
+@router.post("/collaborations", response_model=Post)
+async def add_collaboration(
+    payload: PostCreate,
+    bg_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    payload.type = PostType.collaboration
+    return await add_post(payload, bg_tasks, current_user, db)
+
+@router.post("/opportunities", response_model=Post)
+async def add_opportunity(
+    payload: PostCreate,
+    bg_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role.value not in ["admin", "success_coach"]:
+        raise HTTPException(status_code=403, detail="Not authorized to create opportunities")
+    payload.type = PostType.opportunity
+    return await add_post(payload, bg_tasks, current_user, db)
+
+@router.put("/{post_id}", response_model=Post)
+async def edit_post(
+    post_id: UUID,
+    payload: PostUpdate,
+    bg_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    upload_svc = PostUploadService(db)
+    post_svc = PostService(db)
+    
+    existing_post = await post_svc.post_store.post_repo.get_by_id(post_id)
+    if not existing_post or existing_post.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized or not found")
+        
+    await upload_svc.mark_uploading(post_id)
+    try:
+        if payload.title is not None:
+            existing_post.title = payload.title
+        if payload.content is not None:
+            existing_post.content = payload.content
+        if payload.category_id is not None:
+            existing_post.category_id = payload.category_id
+        if payload.type is not None:
+            existing_post.type = payload.type
+        if payload.date_at is not None:
+            existing_post.date_at = payload.date_at
+        if payload.restricted_to_college_id is not None:
+            existing_post.restricted_to_college_id = payload.restricted_to_college_id
+        if payload.resources is not None:
+            existing_post.resources = [res.model_dump() for res in payload.resources]
+        if payload.action_status is not None:
+            existing_post.action_status = payload.action_status
+        if payload.status is not None:
+            existing_post.status = payload.status
+        if payload.moderation_status is not None:
+            existing_post.moderation_status = payload.moderation_status
+        if payload.is_active is not None:
+            existing_post.is_active = payload.is_active
+            
+        if payload.media_ids is not None:
+            existing_post.media = []
+            for i, media_id in enumerate(payload.media_ids):
+                existing_post.media.append(DBPostMedia(url=media_id, media_type=MediaType.image, position=i+1))
+            bg_tasks.add_task(make_media_permanent_bg, payload.media_ids)
+            
+        updated = await post_svc.update_post(existing_post)
+        return updated
+    finally:
+        await upload_svc.mark_completed(post_id)
 
 
 @router.get("/{post_id}", response_model=Post)
@@ -84,13 +229,13 @@ async def like_post(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    post_interaction_svc = PostInteractionsService(db)
-    post_interaction = await post_interaction_svc.like(post_id, current_user.id)
-    if not post_interaction:
+    reaction_svc = ReactionService(db)
+    post_reaction = await reaction_svc.like(post_id, current_user.id)
+    if not post_reaction:
         return {"message": "Post not liked"}
     return {
         "message": "Post liked successfully",
-        "post_interaction": post_interaction,
+        "post_interaction": post_reaction,
     }
 
 
@@ -100,13 +245,13 @@ async def unlike_post(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    post_interaction_svc = PostInteractionsService(db)
-    post_interaction = await post_interaction_svc.unlike(post_id, current_user.id)
-    if not post_interaction:
-        return {"message": "Post not liked"}
+    reaction_svc = ReactionService(db)
+    post_reaction = await reaction_svc.unlike(post_id, current_user.id)
+    if not post_reaction:
+        return {"message": "Post not unliked"}
     return {
-        "message": "Post liked successfully",
-        "post_interaction": post_interaction,
+        "message": "Post unliked successfully",
+        "post_interaction": post_reaction,
     }
 
 

@@ -3,8 +3,11 @@ from app.api.posts import router as post_router
 from app.api.comments import router as comments_router
 from app.api.redis import router as redis_router
 from app.api.feeds import router as feeds_router
-from app.api.categories import router as category_router
+
 from app.api.users import router as user_router
+from app.api.colleges import router as colleges_router
+from app.api.categories import router as categories_router
+from app.api.media import router as media_router
 from app.auth import router as auth_router
 
 api_router = APIRouter()
@@ -19,6 +22,18 @@ api_router.include_router(
     user_router,
     prefix="/users",
     tags=["Users"],
+)
+
+api_router.include_router(
+    colleges_router,
+    prefix="/colleges",
+    tags=["Colleges"],
+)
+
+api_router.include_router(
+    categories_router,
+    prefix="/categories",
+    tags=["Categories"],
 )
 
 api_router.include_router(
@@ -39,14 +54,14 @@ api_router.include_router(
     tags=["Comments"],
 )
 
+api_router.include_router(
+    media_router,
+    prefix="/media",
+    tags=["Media"],
+)
+
 # api_router.include_router(
 #     redis_router,
 #     prefix="/redis",
 #     tags=["Debug"],
 # )
-
-api_router.include_router(
-    category_router,
-    prefix="/category",
-    tags=["Categories"],
-)

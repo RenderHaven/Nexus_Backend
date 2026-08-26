@@ -2,12 +2,14 @@ from app.domains.pool.core.pool_group import PoolGroup
 from app.domains.pool.redis import PoolStore
 from collections import defaultdict
 from app.domains.pool.core.base_pool import BasePool
+from app.domains.cursor.service import CursorService
 
 
 class PoolService:
 
     def __init__(self):
         self.pool_store = PoolStore()
+        self.cursor_svc = CursorService()
 
     async def build(self, pool: BasePool):
         """Build or rebuild a pool."""
@@ -53,7 +55,7 @@ class PoolService:
 
         return post_ids
 
-    async def get_post_ids(
+    async def _get_post_ids_by_offsets(
         self,
         group_or_pool: PoolGroup | BasePool,
         limit: int = 10,
@@ -99,4 +101,33 @@ class PoolService:
             )
 
         return post_ids, new_offsets
+
+    async def get_post_ids(
+        self,
+        group_or_pool: PoolGroup | BasePool,
+        cursor_key: str | None = None,
+        limit: int = 10,
+        extra_cursor_data: dict | None = None,
+    ):
+        cursor = await self.cursor_svc.get_cursor(cursor_key)
+        offsets = cursor.get("offsets", {}) if cursor else {}
+        
+        post_ids, new_offsets = await self._get_post_ids_by_offsets(
+            group_or_pool=group_or_pool,
+            limit=limit,
+            offsets=offsets
+        )
+        
+        offsets.update(new_offsets)
+        
+        cursor_data = {"offsets": offsets}
+        if extra_cursor_data:
+            cursor_data.update(extra_cursor_data)
+            
+        new_cursor_key = await self.cursor_svc.update_cursor(
+            cursor_data,
+            cursor_key
+        )
+        
+        return post_ids, new_cursor_key
 

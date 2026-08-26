@@ -1,41 +1,21 @@
 from uuid import UUID
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-
 from app.db.models import Category
-
+from .domain import CategoryBasic
 
 class CategoryRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create(self, category:Category)->Category:
-        self.db.add(category)
-        await self.db.commit()
-        await self.db.refresh(category)
-        return category
+    async def get_category(self, category_id: UUID) -> CategoryBasic | None:
+        result = await self.db.execute(select(Category).where(Category.id == category_id))
+        category = result.scalars().first()
+        if not category:
+            return None
+        return CategoryBasic.model_validate(category)
 
-    async def update(self, category:Category)->Category:
-        self.db.add(category)
-        await self.db.commit()
-        await self.db.refresh(category)
-        return category
-
-    async def delete(self, category:Category)->Category:
-        await self.db.delete(category)
-        await self.db.commit()
-        return category
-
-    async def get_by_id(self, category_id:UUID)->Category:
-        category = await self.db.get(Category, category_id)
-        return category        
-    
-    async def get_all(self):
-        result = await self.db.execute(
-            select(Category)
-        )
-
-        return result.scalars().all()
-    
+    async def get_all_categories(self) -> list[CategoryBasic]:
+        result = await self.db.execute(select(Category))
+        categories = result.scalars().all()
+        return [CategoryBasic.model_validate(c) for c in categories]

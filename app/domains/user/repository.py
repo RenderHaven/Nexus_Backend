@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.models import User, UserInterest, UserOpenTo, UserBadge
+from app.db.models import Post
 
 
 class UserRepository:
@@ -62,3 +63,14 @@ class UserRepository:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def get_posts_ids(self,user_id:UUID,limit:int)->list[Post]:
+        result=await self.db.execute(
+            select(Post)
+            .where(Post.user_id == user_id)
+            .order_by(Post.created_at.desc())
+            .limit(limit)
+        )
+
+        return list(result.scalars().all())
+
