@@ -21,13 +21,11 @@ class PostRepository:
     async def create(self, post: Post) -> Post:
         self.db.add(post)
         await self.db.commit()
-        await self.db.refresh(post)
         return post
 
     async def update(self, post: Post) -> Post:
         self.db.add(post)
         await self.db.commit()
-        await self.db.refresh(post)
         return post
 
     async def delete(self, post: Post) -> Post:

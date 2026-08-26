@@ -162,12 +162,14 @@ class Post(BaseModel):
     is_liked: bool | None = None
 
 
+class PostIdResponse(BaseModel):
+    post_id: UUID
+
+
 class PostCreate(BaseModel):
-    user_id: UUID
-    college_id: UUID
     category_id: UUID
     type: PostType
-    title: str | None = None
+    title: str | None=None
     content: str
     date_at: datetime | None = None
     restricted_to_college_id: UUID | None = None

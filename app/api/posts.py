@@ -12,7 +12,7 @@ from app.domains.reaction.service import ReactionService
 from app.domains.post.service import PostService
 from app.domains.types.enum import PostType
 from app.domains.types.service import PostTypeService
-from app.schemas.schemas import Post
+from app.schemas.schemas import Post, PostIdResponse
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from app.schemas.schemas import PostCreate, PostUpdate, MediaType
@@ -24,10 +24,10 @@ router = APIRouter()
 class PostIDsRequest(BaseModel):
     post_ids: list[UUID]
 
-def create_db_post_from_schema(payload: PostCreate, current_user_id: UUID) -> DBPost:
+def create_db_post_from_schema(payload: PostCreate, current_user: User) -> DBPost:
     db_post = DBPost(
-        user_id=current_user_id,
-        college_id=payload.college_id,
+        user_id=current_user.id,
+        college_id=current_user.college_id,
         category_id=payload.category_id,
         type=payload.type,
         title=payload.title,
@@ -53,7 +53,7 @@ async def get_upload_status(post_id: UUID, db: AsyncSession = Depends(get_db)):
     upload_svc = PostUploadService(db)
     return await upload_svc.get_upload_status(post_id)
 
-@router.post("/", response_model=Post)
+@router.post("/", response_model=PostIdResponse)
 async def add_post(
     payload: PostCreate,
     bg_tasks: BackgroundTasks,
@@ -63,7 +63,7 @@ async def add_post(
     upload_svc = PostUploadService(db)
     post_svc = PostService(db)
     
-    db_post = create_db_post_from_schema(payload, current_user.id)
+    db_post = create_db_post_from_schema(payload, current_user)
     
     # Mark as uploading based on an arbitrary UUID before creation
     # But we don't have the ID yet unless we generate it
@@ -73,14 +73,14 @@ async def add_post(
     await upload_svc.mark_uploading(db_post.id)
     
     try:
-        created_post = await post_svc.add_post(db_post)
+        created_post_id = await post_svc.add_post(db_post)
         if payload.media_ids:
             bg_tasks.add_task(make_media_permanent_bg, payload.media_ids)
-        return created_post
+        return {"post_id": created_post_id}
     finally:
         await upload_svc.mark_completed(db_post.id)
 
-@router.post("/events", response_model=Post)
+@router.post("/events", response_model=PostIdResponse)
 async def add_event(
     payload: PostCreate,
     bg_tasks: BackgroundTasks,
@@ -92,7 +92,7 @@ async def add_event(
     payload.type = PostType.event
     return await add_post(payload, bg_tasks, current_user, db)
 
-@router.post("/collaborations", response_model=Post)
+@router.post("/collaborations", response_model=PostIdResponse)
 async def add_collaboration(
     payload: PostCreate,
     bg_tasks: BackgroundTasks,
@@ -102,7 +102,7 @@ async def add_collaboration(
     payload.type = PostType.collaboration
     return await add_post(payload, bg_tasks, current_user, db)
 
-@router.post("/opportunities", response_model=Post)
+@router.post("/opportunities", response_model=PostIdResponse)
 async def add_opportunity(
     payload: PostCreate,
     bg_tasks: BackgroundTasks,
@@ -114,7 +114,7 @@ async def add_opportunity(
     payload.type = PostType.opportunity
     return await add_post(payload, bg_tasks, current_user, db)
 
-@router.put("/{post_id}", response_model=Post)
+@router.put("/{post_id}", response_model=PostIdResponse)
 async def edit_post(
     post_id: UUID,
     payload: PostUpdate,
@@ -160,8 +160,8 @@ async def edit_post(
                 existing_post.media.append(DBPostMedia(url=media_id, media_type=MediaType.image, position=i+1))
             bg_tasks.add_task(make_media_permanent_bg, payload.media_ids)
             
-        updated = await post_svc.update_post(existing_post)
-        return updated
+        updated_post_id = await post_svc.update_post(existing_post)
+        return {"post_id": updated_post_id}
     finally:
         await upload_svc.mark_completed(post_id)
 

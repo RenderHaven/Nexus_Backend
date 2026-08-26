@@ -67,18 +67,16 @@ class PostStorage:
 
         return results
 
-    async def add_post(self, post) -> Post:
+    async def add_post(self, post) -> UUID:
         db_post = await self.post_repo.create(post)
-        validated = Post.model_validate(db_post)
-        await self.post_store.set(str(validated.id), validated.model_dump(mode="json"))
-        await self.post_store.add_active_post(str(validated.id))
-        return validated
+        await self.post_store.add_active_post(str(db_post.id))
+        return db_post.id
 
-    async def update(self, post) -> Post:
+    async def update(self, post) -> UUID:
         db_post = await self.post_repo.update(post)
-        validated = Post.model_validate(db_post)
-        await self.post_store.set(str(validated.id), validated.model_dump(mode="json"))
-        return validated
+        # Delete cache since post was updated and we only have partial data
+        await self.post_store.delete(str(db_post.id))
+        return db_post.id
 
     async def delete(self, post_id: UUID) -> bool:
         db_post = await self.post_repo.get_by_id(post_id)

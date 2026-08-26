@@ -5,6 +5,7 @@ from uuid import UUID
 from app.domains.categories.service import CategoryService
 from app.domains.cursor.service import CursorService
 from app.domains.feed.pools.popular import PopularPool
+from app.domains.feed.pools.recent import RecentPool
 from app.domains.feed.repository import FeedRepository
 from app.domains.pool.core.base_pool import BasePool
 from app.domains.pool.core.pool_group import PoolGroup
@@ -34,6 +35,7 @@ class FeedService:
         # Feed groups
         self.feed_grps: dict[str, BasePool | PoolGroup] = {
             "popular": PopularPool(db_repo=self.feed_repo),
+            "recent" : RecentPool(db_repo=self.feed_repo),
         }
 
     # ------------------------------------------------------------------
