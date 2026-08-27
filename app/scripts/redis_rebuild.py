@@ -3,13 +3,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.db.session import engine
 from app.domains.reaction.service import ReactionService
 from app.domains.feed.service import FeedService
-from app.domains.post.service import PostService
 
-async def rebuild_post_registry():
-    SessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    async with SessionLocal() as db:
-        svc = PostService(db)
-        await svc.build_registry()
 
 async def rebuild_interactions():
     SessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -27,7 +21,6 @@ async def rebuild_feed_pools():
 
 async def run_all():
     print("--- Starting full Redis rebuild ---")
-    await rebuild_post_registry()
     await rebuild_interactions()
     await rebuild_feed_pools()
     print("--- Full Redis rebuild complete ---")

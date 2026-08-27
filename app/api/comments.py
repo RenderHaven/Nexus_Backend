@@ -24,6 +24,8 @@ async def get_many_comments(
     return await comment_svc.get_many_comments(payload.comment_ids)
 
 
+from fastapi import HTTPException
+
 @router.get("/{comment_id}",response_model=Comment)
 async def get_comment(
     comment_id: UUID,
@@ -32,7 +34,7 @@ async def get_comment(
     comment_svc = CommentService(db)
     comment = await comment_svc.get_comment(comment_id)
     if not comment:
-        return {"message": "Comment not found"}
+        raise HTTPException(status_code=404, detail="Comment not found")
     return comment
 
 
@@ -50,16 +52,18 @@ async def get_reply_ids(
     return {"reply_ids": reply_ids, "next_cursor": next_cursor}
 
 
+from app.schemas.schemas import CommentRequest
+
 @router.post("/{comment_id}/reply")
 async def comment_reply(
     comment_id: UUID,
-    comment: str,
+    payload: CommentRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     comment_svc = CommentService(db)
     post_interaction = await comment_svc.add_comment_reply(
-        current_user.id, comment_id, comment
+        current_user.id, comment_id, payload.comment
     )
     if not post_interaction:
         return {"status": "error", "message": "Comment reply not added"}
@@ -73,13 +77,13 @@ async def comment_reply(
 @router.post("/{comment_id}/edit")
 async def edit_comment(
     comment_id: UUID,
-    comment: str,
+    payload: CommentRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     comment_svc = CommentService(db)
     post_interaction = await comment_svc.edit_comment(
-        current_user.id, comment_id, comment
+        current_user.id, comment_id, payload.comment
     )
     if not post_interaction:
         return {"status": "error", "message": "Comment not edited"}

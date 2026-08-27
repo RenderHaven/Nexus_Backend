@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 from app.api.posts import router as post_router
 from app.api.comments import router as comments_router
-from app.api.redis import router as redis_router
 from app.api.feeds import router as feeds_router
 
 from app.api.users import router as user_router
@@ -60,8 +59,3 @@ api_router.include_router(
     tags=["Media"],
 )
 
-# api_router.include_router(
-#     redis_router,
-#     prefix="/redis",
-#     tags=["Debug"],
-# )

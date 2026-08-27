@@ -195,6 +195,10 @@ class PostUpdate(BaseModel):
     media_ids: list[str] | None = None
 
 
+class CommentRequest(BaseModel):
+    comment: str = Field(..., max_length=1000)
+
+
 class CollaborationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

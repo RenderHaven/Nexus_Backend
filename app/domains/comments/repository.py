@@ -122,8 +122,10 @@ class CommentRepository:
             raise Exception("Comment not found")
 
         if post_comment.user_id != user_id:
-            raise Exception(
-                "Comment is not owned by the user"
+            from fastapi import HTTPException
+            raise HTTPException(
+                status_code=403,
+                detail="Comment is not owned by the user"
             )
 
         if not post_comment.is_active:

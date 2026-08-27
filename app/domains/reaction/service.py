@@ -1,6 +1,5 @@
 from sqlalchemy import UUID
 from app.domains.reaction.repository import PostInteractionRepository
-from app.kafka.client import kafka_manager
 from app.config import settings
 
 from app.domains.reaction.redis import ReactionRedis
@@ -12,36 +11,27 @@ class ReactionService:
         self.redis_store = ReactionRedis()
 
     async def get_post_interaction(self, post_interaction_id: UUID):
-        try:
-            return await self.post_interaction_store.get_by_id(post_interaction_id)
-        except Exception as e:
-            raise e
+        return await self.post_interaction_store.get_by_id(post_interaction_id)
         
     async def like(self, post_id: UUID, user_id: UUID):
-        try:
-            reaction = await self.post_interaction_store.update_like(post_id, user_id, True, commit=True)
-            if reaction:
-                await self.redis_store.update(str(post_id), str(user_id), like=True)
-                from app.domains.post.service import PostService
-                post_svc = PostService(self.db)
-                await post_svc.post_store.update_like_count(post_id, 1)
+        reaction = await self.post_interaction_store.update_like(post_id, user_id, True, commit=True)
+        if reaction:
+            await self.redis_store.update(str(post_id), str(user_id), like=True)
+            from app.domains.post.service import PostService
+            post_svc = PostService(self.db)
+            await post_svc.post_store.update_like_count(post_id, 1)
 
-            return {"status": "success", "action": "like.created", "post_id": str(post_id), "user_id": str(user_id)}
-        except Exception as e:
-            raise e
+        return {"status": "success", "action": "like.created", "post_id": str(post_id), "user_id": str(user_id)}
 
     async def unlike(self, post_id: UUID, user_id: UUID):
-        try:
-            reaction = await self.post_interaction_store.update_like(post_id, user_id, False, commit=True)
-            if reaction:
-                await self.redis_store.update(str(post_id), str(user_id), like=False)
-                from app.domains.post.service import PostService
-                post_svc = PostService(self.db)
-                await post_svc.post_store.update_like_count(post_id, -1)
-                
-            return {"status": "success", "action": "like.deleted", "post_id": str(post_id), "user_id": str(user_id)}
-        except Exception as e:
-            raise e
+        reaction = await self.post_interaction_store.update_like(post_id, user_id, False, commit=True)
+        if reaction:
+            await self.redis_store.update(str(post_id), str(user_id), like=False)
+            from app.domains.post.service import PostService
+            post_svc = PostService(self.db)
+            await post_svc.post_store.update_like_count(post_id, -1)
+            
+        return {"status": "success", "action": "like.deleted", "post_id": str(post_id), "user_id": str(user_id)}
 
     async def update_db_batch(self, batch_messages):
         """Update DB with a batch of reaction messages."""

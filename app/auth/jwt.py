@@ -4,7 +4,9 @@ from typing import Any, Union
 
 from jose import jwt
 
-SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-that-should-be-changed")
+from app.config import settings
+
+SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

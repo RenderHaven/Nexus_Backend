@@ -17,7 +17,6 @@ from app.schemas.schemas import Post, PostIdResponse
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from app.schemas.schemas import PostCreate, PostUpdate, MediaType
 from app.db.models import Post as DBPost, PostMedia as DBPostMedia
-from app.domains.post.service import PostUploadService
 
 router = APIRouter()
 
@@ -48,10 +47,7 @@ def make_media_permanent_bg(media_ids: list[str]):
     from app.media.service import MediaService
     MediaService().make_permanent(media_ids)
 
-@router.get("/upload_status/{post_id}")
-async def get_upload_status(post_id: UUID, db: AsyncSession = Depends(get_db)):
-    upload_svc = PostUploadService(db)
-    return await upload_svc.get_upload_status(post_id)
+
 
 @router.post("/", response_model=PostIdResponse)
 async def add_post(
@@ -60,29 +56,21 @@ async def add_post(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    upload_svc = PostUploadService(db)
     post_svc = PostService(db)
     
     db_post = create_db_post_from_schema(payload, current_user)
     
-    # Mark as uploading based on an arbitrary UUID before creation
-    # But we don't have the ID yet unless we generate it
     import uuid
     db_post.id = uuid.uuid4()
     
-    await upload_svc.mark_uploading(db_post.id)
-    
-    try:
-        created_post_id = await post_svc.add_post(db_post)
-        if payload.media_ids:
-            bg_tasks.add_task(make_media_permanent_bg, payload.media_ids)
-        return {
-            "status": "success",
-            "message": "Post added successfully",
-            "post_id": created_post_id
-        }
-    finally:
-        await upload_svc.mark_completed(db_post.id)
+    created_post_id = await post_svc.add_post(db_post)
+    if payload.media_ids:
+        bg_tasks.add_task(make_media_permanent_bg, payload.media_ids)
+    return {
+        "status": "success",
+        "message": "Post added successfully",
+        "post_id": created_post_id
+    }
 
 @router.post("/events", response_model=PostIdResponse)
 async def add_event(
@@ -126,71 +114,67 @@ async def edit_post(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    upload_svc = PostUploadService(db)
     post_svc = PostService(db)
     
     existing_post = await post_svc.post_store.post_repo.get_by_id(post_id)
     if not existing_post or existing_post.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized or not found")
         
-    await upload_svc.mark_uploading(post_id)
-    try:
-        if payload.title is not None:
-            existing_post.title = payload.title
-        if payload.content is not None:
-            existing_post.content = payload.content
-        if payload.category_id is not None:
-            existing_post.category_id = payload.category_id
-        if payload.type is not None:
-            existing_post.type = payload.type
-        if payload.date_at is not None:
-            existing_post.date_at = payload.date_at
-        if payload.restricted_to_college_id is not None:
-            existing_post.restricted_to_college_id = payload.restricted_to_college_id
-        if payload.resources is not None:
-            existing_post.resources = [res.model_dump() for res in payload.resources]
-        if payload.action_status is not None:
-            existing_post.action_status = payload.action_status
-        if payload.status is not None:
-            existing_post.status = payload.status
-        if payload.moderation_status is not None:
-            existing_post.moderation_status = payload.moderation_status
-        if payload.is_active is not None:
-            existing_post.is_active = payload.is_active
-            
-        if payload.media_ids is not None:
-            existing_post.media = []
-            for i, media_id in enumerate(payload.media_ids):
-                existing_post.media.append(DBPostMedia(url=media_id, media_type=MediaType.image, position=i+1))
-            bg_tasks.add_task(make_media_permanent_bg, payload.media_ids)
-            
-        updated_post_id = await post_svc.update_post(existing_post)
-        return {
-            "status": "success",
-            "message": "Post updated successfully",
-            "post_id": updated_post_id
-        }
-    finally:
-        await upload_svc.mark_completed(post_id)
+    if payload.title is not None:
+        existing_post.title = payload.title
+    if payload.content is not None:
+        existing_post.content = payload.content
+    if payload.category_id is not None:
+        existing_post.category_id = payload.category_id
+    if payload.type is not None:
+        existing_post.type = payload.type
+    if payload.date_at is not None:
+        existing_post.date_at = payload.date_at
+    if payload.restricted_to_college_id is not None:
+        existing_post.restricted_to_college_id = payload.restricted_to_college_id
+    if payload.resources is not None:
+        existing_post.resources = [res.model_dump() for res in payload.resources]
+    if payload.action_status is not None:
+        existing_post.action_status = payload.action_status
+    if payload.status is not None:
+        existing_post.status = payload.status
+    if payload.moderation_status is not None:
+        existing_post.moderation_status = payload.moderation_status
+    if payload.is_active is not None:
+        existing_post.is_active = payload.is_active
+        
+    if payload.media_ids is not None:
+        from app.db.models import PostMedia as DBPostMedia
+        existing_post.media = []
+        for i, media_id in enumerate(payload.media_ids):
+            existing_post.media.append(DBPostMedia(url=media_id, media_type=MediaType.image, position=i+1))
+        bg_tasks.add_task(make_media_permanent_bg, payload.media_ids)
+        
+    updated_post_id = await post_svc.update_post(existing_post)
+    return {
+        "status": "success",
+        "message": "Post updated successfully",
+        "post_id": updated_post_id
+    }
 
 
 @router.get("/{post_id}", response_model=Post)
 async def get_post(
     post_id: UUID,
-    user_id: User | None = Depends(get_current_user_id_optional),
+    user_id: UUID | None = Depends(get_current_user_id_optional),
     db: AsyncSession = Depends(get_db),
 ):
     post_svc = PostService(db)
     post = await post_svc.get_post(post_id, user_id)
     if not post:
-        return {"message": "No post found"}
+        raise HTTPException(status_code=404, detail="No post found")
     return post
 
 
 @router.post("/batch", response_model=list[Post])
 async def get_posts(
     payload: PostIDsRequest,
-    user_id: User | None = Depends(get_current_user_id_optional),
+    user_id: UUID | None = Depends(get_current_user_id_optional),
     db: AsyncSession = Depends(get_db),
 ):
     post_svc = PostService(db)
@@ -214,15 +198,17 @@ async def get_comment_ids(
     return {"comment_ids": comment_ids, "next_cursor": next_cursor}
 
 
+from app.schemas.schemas import CommentRequest
+
 @router.post("/{post_id}/comment")
 async def comment_post(
     post_id: UUID,
-    comment: str,
+    payload: CommentRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     comment_svc = CommentService(db)
-    post_interaction = await comment_svc.comment(post_id, current_user.id, comment)
+    post_interaction = await comment_svc.comment(post_id, current_user.id, payload.comment)
     if not post_interaction:
         return {"status": "error", "message": "Post not commented"}
     return {
@@ -269,7 +255,7 @@ async def unlike_post(
 @router.get("/type/{post_type}/post_ids")
 async def get_type_post_ids(
     post_type: PostType,
-    user_id: User | None = Depends(get_current_user_id_optional),
+    user_id: UUID | None = Depends(get_current_user_id_optional),
     cursor: str | None = None,
     limit: int = 10,
     db: AsyncSession = Depends(get_db),

@@ -46,19 +46,9 @@ class RedisKeys:
         return f"pool_group:cursor:{id}"
 
     @staticmethod
-    def active_posts() -> str:
-        return "post:all"
-
-    @staticmethod
     def comment(comment_id: str) -> str:
         return f"comments:{comment_id}"
     
     @staticmethod
     def comment_replies(comment_id: str) -> str:
         return f"comments:replies:{comment_id}"
-
-    @staticmethod
-    def uploading_posts() -> str:
-        return "post:uploading_posts"
-
-    

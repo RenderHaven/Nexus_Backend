@@ -8,11 +8,11 @@ from app.schemas.schemas import Post
 class PostStorage:
 
     def __init__(self, db):
-        self.post_store = PostStore()
+        self.redis_store = PostStore()
         self.post_repo = PostRepository(db)
 
     async def get(self, post_id: UUID) -> Post | None:
-        post = await self.post_store.get(str(post_id))
+        post = await self.redis_store.get(str(post_id))
 
         if post:
             return Post.model_validate(post)
@@ -24,12 +24,10 @@ class PostStorage:
 
         post = Post.model_validate(db_post)
 
-        await self.post_store.set(
+        await self.redis_store.set(
             post.id,
             post.model_dump(mode="json")
         )
-
-        await self.post_store.add_active_post(str(post.id))
 
         return post
 
@@ -37,7 +35,7 @@ class PostStorage:
         if not post_ids:
             return []
 
-        cached_items = await self.post_store.get_many([str(pid) for pid in post_ids])
+        cached_items = await self.redis_store.get_many([str(pid) for pid in post_ids])
 
         post_map: dict[UUID, dict] = {}
         missing_ids: list[UUID] = []
@@ -54,11 +52,10 @@ class PostStorage:
                 new_posts = [Post.model_validate(p) for p in db_posts]
                 new_dicts = [p.model_dump(mode="json") for p in new_posts]
 
-                await self.post_store.set_many(new_dicts)
+                await self.redis_store.set_many(new_dicts)
 
                 for p in new_posts:
                     post_map[p.id] = p.model_dump(mode="json")
-                    await self.post_store.add_active_post(str(p.id))
 
         results = []
         for pid in post_ids:
@@ -69,21 +66,19 @@ class PostStorage:
 
     async def add_post(self, post) -> UUID:
         db_post = await self.post_repo.create(post)
-        await self.post_store.add_active_post(str(db_post.id))
         return db_post.id
 
     async def update(self, post) -> UUID:
         db_post = await self.post_repo.update(post)
         # Delete cache since post was updated and we only have partial data
-        await self.post_store.delete(str(db_post.id))
+        await self.redis_store.delete(str(db_post.id))
         return db_post.id
 
     async def delete(self, post_id: UUID) -> bool:
         db_post = await self.post_repo.get_by_id(post_id)
         if db_post:
             await self.post_repo.delete(db_post)
-            await self.post_store.delete(str(post_id))
-            await self.post_store.remove_active_post(str(post_id))
+            await self.redis_store.delete(str(post_id))
             return True
         return False
 
@@ -96,12 +91,11 @@ class PostStorage:
             .where(DBPost.id == post_id)
             .values(like_count=DBPost.like_count + change)
         )
-        await self.post_repo.db.commit()
 
-        cached = await self.post_store.get(str(post_id))
+        cached = await self.redis_store.get(str(post_id))
         if cached:
             cached['like_count'] = max(0, cached.get('like_count', 0) + change)
-            await self.post_store.set(str(post_id), cached)
+            await self.redis_store.set(str(post_id), cached)
         return True
 
     async def update_comment_count(self, post_id: UUID, change: int) -> bool:
@@ -113,10 +107,9 @@ class PostStorage:
             .where(DBPost.id == post_id)
             .values(comment_count=DBPost.comment_count + change)
         )
-        await self.post_repo.db.commit()
 
-        cached = await self.post_store.get(str(post_id))
+        cached = await self.redis_store.get(str(post_id))
         if cached:
             cached['comment_count'] = max(0, cached.get('comment_count', 0) + change)
-            await self.post_store.set(str(post_id), cached)
+            await self.redis_store.set(str(post_id), cached)
         return True
