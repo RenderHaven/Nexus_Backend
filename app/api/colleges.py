@@ -11,9 +11,19 @@ from app.domains.colleges.domain import CollegeBasic
 
 router = APIRouter()
 
-@router.get("/my_college")
-async def get_my_college(current_user: UserModel = Depends(get_current_user)):
-    pass
+@router.get("/my_college",response_model=CollegeBasic)
+async def get_my_college(
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = CollegeService(db)
+    college = await service.get_college(current_user.college_id)
+    if not college:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="College not found",
+        )
+    return college
 
 
 @router.get("/{college_id}", response_model=CollegeBasic)
@@ -31,14 +41,14 @@ async def get_college(
     return college
 
 @router.get("/post_ids")
-async def get_college_posts(
+async def get_my_college_posts(
     cursor: str | None = None,
     limit: int = 10,
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
     service = CollegeService(db)
-    posts, next_cursor = await service.get_posts(
+    posts, next_cursor = await service.get_post_ids(
         college_id=current_user.college_id,
         cursor_key=cursor,
         limit=limit,
@@ -57,7 +67,7 @@ async def get_college_posts(
     db: AsyncSession = Depends(get_db),
 ):
     service = CollegeService(db)
-    posts, next_cursor = await service.get_posts(
+    posts, next_cursor = await service.get_post_ids(
         college_id=college_id,
         cursor_key=cursor,
         limit=limit,

@@ -18,6 +18,27 @@ async def get_me(current_user: UserModel = Depends(get_current_user)):
     return UserSchema.model_validate(current_user)
 
 
+@router.get("/my_post_ids")
+async def get_my_user_posts(
+    cursor: str | None = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: UUID = Depends(get_current_user_id),
+):
+    service = UserService(db)
+    print(current_user_id)
+    post_ids, next_cursor = await service.get_post_ids(
+        user_id=current_user_id,
+        cursor_key=cursor,
+        limit=limit,
+    )
+    
+    return {
+        "posts": post_ids,
+        "next_cursor": next_cursor,
+    }
+
+
 @router.get("/{user_id}", response_model=UserBasic)
 async def get_user(
     user_id: UUID,
@@ -46,25 +67,6 @@ async def get_profile(
             detail="Profile not found",
         )
     return profile
-
-@router.get("/my_post_ids")
-async def get_user_posts(
-    cursor: str | None = None,
-    limit: int = 10,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: UUID = Depends(get_current_user_id),
-):
-    service = UserService(db)
-    post_ids, next_cursor = await service.get_post_ids(
-        user_id=current_user_id,
-        cursor_key=cursor,
-        limit=limit,
-    )
-    
-    return {
-        "posts": post_ids,
-        "next_cursor": next_cursor,
-    }
 
 @router.get("/{user_id}/post_ids")
 async def get_user_posts(

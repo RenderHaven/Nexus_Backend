@@ -19,7 +19,7 @@ class RedisKeys:
     
     @staticmethod
     def pool(pool_name:str):
-        return f"feed:{pool_name}"
+        return f"pool:{pool_name}"
     
     @staticmethod
     def category(category_id:str='all'):

@@ -29,9 +29,9 @@ class PoolService:
                 )
             )
 
-        await self.pool_store.clear(pool.pool_name)
-        await self.pool_store.add_many(
-            pool.pool_name,
+        await self.pool_store.clear(pool)
+        await self.pool_store.create(
+            pool,
             ranked_posts,
         )
 
@@ -41,11 +41,11 @@ class PoolService:
         offset: int = 0,
         limit: int = 10
     ):
-        if not await self.pool_store.exists(pool.pool_name):
+        if not await self.pool_store.is_valid(pool):
             await self.build(pool)
         
         post_ids = await self.pool_store.top(
-            pool.pool_name,
+            pool,
             offset,
             limit,
         )
@@ -130,4 +130,3 @@ class PoolService:
         )
         
         return post_ids, new_cursor_key
-
