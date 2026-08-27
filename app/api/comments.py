@@ -2,11 +2,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.domains.comments.domain import Comment
+from app.domains.comments.schemas import Comment
 from app.auth import get_current_user
 from app.db.models import User
 from app.db.session import get_db
+from app.db.session import get_db
 from app.domains.comments.service import CommentService
+from app.schemas.common import Paginated
 
 router = APIRouter()
 
@@ -38,7 +40,7 @@ async def get_comment(
     return comment
 
 
-@router.get("/{comment_id}/reply_ids")
+@router.get("/{comment_id}/reply_ids", response_model=Paginated[UUID])
 async def get_reply_ids(
     comment_id: UUID,
     cursor: str | None = None,
@@ -48,11 +50,11 @@ async def get_reply_ids(
     comment_svc = CommentService(db)
     reply_ids, next_cursor = await comment_svc.get_reply_ids(comment_id, cursor=cursor, limit=limit)
     if not reply_ids:
-        return {"reply_ids": [], "next_cursor": None}
-    return {"reply_ids": reply_ids, "next_cursor": next_cursor}
+        return {"items": [], "next_cursor": None}
+    return {"items": reply_ids, "next_cursor": next_cursor}
 
 
-from app.schemas.schemas import CommentRequest
+from app.domains.comments.schemas import CommentRequest
 
 @router.post("/{comment_id}/reply")
 async def comment_reply(

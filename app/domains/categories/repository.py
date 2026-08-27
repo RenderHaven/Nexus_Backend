@@ -2,7 +2,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Category
-from .domain import CategoryBasic
+from .schemas import CategoryBasic
 
 class CategoryRepository:
     def __init__(self, db: AsyncSession):

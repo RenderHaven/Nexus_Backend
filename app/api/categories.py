@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.domains.categories.service import CategoryService
-from app.domains.categories.domain import CategoryBasic
+from app.domains.categories.schemas import CategoryBasic
 
 router = APIRouter()
 

@@ -3,7 +3,7 @@ from app.domains.pool.service import PoolService
 from app.domains.colleges.pools.college_post_pool import CollegePostPool
 from app.domains.colleges.repository import CollegeRepository
 from app.domains.colleges.storage import CollegeStorage
-from app.domains.colleges.domain import CollegeBasic
+from app.domains.colleges.schemas import CollegeBasic
 
 class CollegeService:
     def __init__(self, db):

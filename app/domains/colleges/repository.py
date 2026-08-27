@@ -2,7 +2,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Post, College
-from .domain import CollegeBasic
+from .schemas import CollegeBasic
 
 class CollegeRepository:
     def __init__(self, db: AsyncSession):

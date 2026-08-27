@@ -1,6 +1,6 @@
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Comment(BaseModel):
@@ -16,3 +16,7 @@ class Comment(BaseModel):
     is_active: bool = True
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+class CommentRequest(BaseModel):
+    comment: str = Field(..., max_length=1000)

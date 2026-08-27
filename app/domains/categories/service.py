@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from .storage import CategoryStorage
-from .domain import CategoryBasic
+from .schemas import CategoryBasic
 
 class CategoryService:
     def __init__(self, db: AsyncSession):

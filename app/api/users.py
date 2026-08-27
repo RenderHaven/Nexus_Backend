@@ -4,11 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.domains.user.service import UserService
-from app.schemas.schemas import User as UserSchema
+from app.domains.user.schemas import User as UserSchema
 from app.db.models import User as UserModel
 from app.auth.deps import get_current_user,get_current_user_id
 
-from app.domains.user.domain import UserBasic
+from app.domains.user.schemas import UserBasic
+from app.schemas.common import Paginated
 
 router = APIRouter()
 
@@ -18,7 +19,7 @@ async def get_me(current_user: UserModel = Depends(get_current_user)):
     return UserSchema.model_validate(current_user)
 
 
-@router.get("/my_post_ids")
+@router.get("/my_post_ids", response_model=Paginated[UUID])
 async def get_my_user_posts(
     cursor: str | None = None,
     limit: int = 50,
@@ -34,7 +35,7 @@ async def get_my_user_posts(
     )
     
     return {
-        "posts": post_ids,
+        "items": post_ids,
         "next_cursor": next_cursor,
     }
 
@@ -68,7 +69,7 @@ async def get_profile(
         )
     return profile
 
-@router.get("/{user_id}/post_ids")
+@router.get("/{user_id}/post_ids", response_model=Paginated[UUID])
 async def get_user_posts(
     user_id: UUID,
     cursor: str | None = None,
@@ -83,6 +84,6 @@ async def get_user_posts(
     )
     
     return {
-        "posts": post_ids,
+        "items": post_ids,
         "next_cursor": next_cursor,
     }

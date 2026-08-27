@@ -4,8 +4,7 @@ from app.domains.pool.service import PoolService
 from app.domains.user.pools.user_post_pool import UserPostPool
 from app.domains.user.repository import UserRepository
 from app.domains.user.redis import UserRedisStore
-from app.schemas.schemas import User
-from app.domains.user.domain import UserBasic
+from app.domains.user.schemas import User, UserBasic
 
 
 class UserStorage:

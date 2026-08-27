@@ -1,14 +1,13 @@
 from uuid import UUID
-from alembic.util import status
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.domains.colleges.service import CollegeService
 from app.db.models import User as UserModel
 from app.auth.deps import get_current_user
 
-from app.domains.colleges.domain import CollegeBasic
-
+from app.domains.colleges.schemas import CollegeBasic
+from app.schemas.common import Paginated
 router = APIRouter()
 
 @router.get("/my_college",response_model=CollegeBasic)
@@ -40,7 +39,7 @@ async def get_college(
         )
     return college
 
-@router.get("/post_ids")
+@router.get("/post_ids", response_model=Paginated[UUID])
 async def get_my_college_posts(
     cursor: str | None = None,
     limit: int = 10,
@@ -55,11 +54,11 @@ async def get_my_college_posts(
     )
     
     return {
-        "posts": posts,
+        "items": posts,
         "next_cursor": next_cursor,
     }
 
-@router.get("/{college_id}/post_ids")
+@router.get("/{college_id}/post_ids", response_model=Paginated[UUID])
 async def get_college_posts(
     college_id: UUID,
     cursor: str | None = None,
@@ -74,6 +73,6 @@ async def get_college_posts(
     )
     
     return {
-        "posts": posts,
+        "items": posts,
         "next_cursor": next_cursor,
     }

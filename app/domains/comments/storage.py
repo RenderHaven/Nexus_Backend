@@ -1,6 +1,6 @@
 from datetime import datetime
 from uuid import UUID
-from app.domains.comments.domain import Comment
+from app.domains.comments.schemas import Comment
 from app.domains.comments.redis import CommentsRedis
 from app.domains.comments.repository import CommentRepository
 

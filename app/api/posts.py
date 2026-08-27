@@ -9,13 +9,15 @@ from app.db.models import User
 from app.db.session import get_db
 from app.domains.comments.service import CommentService
 from app.domains.reaction.service import ReactionService
+from app.domains.reaction.schemas import ReactionResult, ReactionAction
 from app.domains.post.service import PostService
 from app.domains.types.enum import PostType
 from app.domains.types.service import PostTypeService
-from app.schemas.schemas import Post, PostIdResponse
+from app.schemas.common import Paginated
+from app.domains.post.schemas import Post, PostIdResponse
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from app.schemas.schemas import PostCreate, PostUpdate, MediaType
+from app.domains.post.schemas import PostCreate, PostUpdate, MediaType
 from app.db.models import Post as DBPost, PostMedia as DBPostMedia
 
 router = APIRouter()
@@ -184,7 +186,7 @@ async def get_posts(
     )
 
 
-@router.get("/{post_id}/comment_ids")
+@router.get("/{post_id}/comment_ids", response_model=Paginated[UUID])
 async def get_comment_ids(
     post_id: UUID,
     cursor: str | None = None,
@@ -194,11 +196,11 @@ async def get_comment_ids(
     comment_svc = CommentService(db)
     comment_ids, next_cursor = await comment_svc.get_comment_ids(post_id, cursor=cursor, limit=limit)
     if not comment_ids:
-        return {"comment_ids": [], "next_cursor": None}
-    return {"comment_ids": comment_ids, "next_cursor": next_cursor}
+        return {"items": [], "next_cursor": None}
+    return {"items": comment_ids, "next_cursor": next_cursor}
 
 
-from app.schemas.schemas import CommentRequest
+from app.domains.comments.schemas import CommentRequest
 
 @router.post("/{post_id}/comment")
 async def comment_post(
@@ -218,7 +220,7 @@ async def comment_post(
     }
 
 
-@router.post("/{post_id}/like")
+@router.post("/{post_id}/like", response_model=ReactionResult)
 async def like_post(
     post_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -226,16 +228,15 @@ async def like_post(
 ):
     reaction_svc = ReactionService(db)
     post_reaction = await reaction_svc.like(post_id, current_user.id)
-    if not post_reaction:
-        return {"status": "error", "message": "Post not liked"}
     return {
         "status": "success",
-        "message": "Post liked successfully",
+        "action": ReactionAction.liked,
         "post_id": post_id,
+        "user_id": current_user.id,
     }
 
 
-@router.post("/{post_id}/unlike")
+@router.post("/{post_id}/unlike", response_model=ReactionResult)
 async def unlike_post(
     post_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -243,16 +244,15 @@ async def unlike_post(
 ):
     reaction_svc = ReactionService(db)
     post_reaction = await reaction_svc.unlike(post_id, current_user.id)
-    if not post_reaction:
-        return {"status": "error", "message": "Post not unliked"}
     return {
         "status": "success",
-        "message": "Post unliked successfully",
+        "action": ReactionAction.unliked,
         "post_id": post_id,
+        "user_id": current_user.id,
     }
 
 
-@router.get("/type/{post_type}/post_ids")
+@router.get("/type/{post_type}/post_ids", response_model=Paginated[UUID])
 async def get_type_post_ids(
     post_type: PostType,
     user_id: UUID | None = Depends(get_current_user_id_optional),
@@ -269,10 +269,10 @@ async def get_type_post_ids(
     )
     if not post_ids:
         return {
-            "posts": [],
+            "items": [],
             "next_cursor": None,
         }
     return {
-        "posts": post_ids,
+        "items": post_ids,
         "next_cursor": next_cursor,
     }

@@ -8,6 +8,7 @@ from app.db.models import User
 from app.db.session import get_db
 from app.domains.cursor.service import CursorService
 from app.domains.feed.service import FeedService
+from app.schemas.common import Paginated
 
 
 router = APIRouter()
@@ -53,7 +54,7 @@ async def get_feed_groups(
     }
 
 
-@router.get("/post_ids/{grp_name}")
+@router.get("/post_ids/{grp_name}", response_model=Paginated[UUID])
 async def get_feed_post_ids(
     grp_name: str,
     user_id: User | None = Depends(
@@ -72,12 +73,12 @@ async def get_feed_post_ids(
 
     if not post_ids:
         return {
-            "posts": [],
+            "items": [],
             "next_cursor": None,
         }
 
     return {
-        "posts": post_ids,
+        "items": post_ids,
         "next_cursor": next_cursor,
     }
 

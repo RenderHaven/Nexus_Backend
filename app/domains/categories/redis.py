@@ -2,7 +2,7 @@ import json
 from uuid import UUID
 from app.redis.client import get_redis
 from app.redis.keys import RedisKeys
-from .domain import CategoryBasic
+from .schemas import CategoryBasic
 
 class CategoryRedisStore:
     def __init__(self):

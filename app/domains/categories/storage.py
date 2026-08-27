@@ -1,6 +1,6 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from .domain import CategoryBasic
+from .schemas import CategoryBasic
 from .repository import CategoryRepository
 from .redis import CategoryRedisStore
 

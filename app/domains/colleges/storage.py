@@ -1,6 +1,6 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from .domain import CollegeBasic
+from .schemas import CollegeBasic
 from .repository import CollegeRepository
 from .redis import CollegeRedisStore
 from app.domains.pool.service import PoolService

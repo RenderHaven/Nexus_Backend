@@ -2,7 +2,7 @@ from uuid import UUID
 
 from app.domains.post.repository import PostRepository
 from app.domains.post.redis import PostStore
-from app.schemas.schemas import Post
+from app.domains.post.schemas import Post
 
 
 class PostStorage:
