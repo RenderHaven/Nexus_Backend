@@ -62,10 +62,11 @@ async def comment_reply(
         current_user.id, comment_id, comment
     )
     if not post_interaction:
-        return {"message": "Comment reply not added"}
+        return {"status": "error", "message": "Comment reply not added"}
     return {
+        "status": "success",
         "message": "Comment reply added successfully",
-        "post_interaction": post_interaction,
+        "comment_id": post_interaction.get("comment_id"),
     }
 
 
@@ -81,10 +82,11 @@ async def edit_comment(
         current_user.id, comment_id, comment
     )
     if not post_interaction:
-        return {"message": "Comment not edited"}
+        return {"status": "error", "message": "Comment not edited"}
     return {
+        "status": "success",
         "message": "Comment edited successfully",
-        "post_interaction": post_interaction,
+        "comment_id": post_interaction.get("comment_id"),
     }
 
 
@@ -97,8 +99,9 @@ async def delete_comment(
     comment_svc = CommentService(db)
     result = await comment_svc.delete(current_user.id, comment_id)
     if not result:
-        return {"message": "Comment not deleted"}
+        return {"status": "error", "message": "Comment not deleted"}
     return {
+        "status": "success",
         "message": "Comment deleted successfully",
-        "post_interaction": result,
+        "comment_id": result.get("comment_id"),
     }

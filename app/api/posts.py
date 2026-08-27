@@ -76,7 +76,11 @@ async def add_post(
         created_post_id = await post_svc.add_post(db_post)
         if payload.media_ids:
             bg_tasks.add_task(make_media_permanent_bg, payload.media_ids)
-        return {"post_id": created_post_id}
+        return {
+            "status": "success",
+            "message": "Post added successfully",
+            "post_id": created_post_id
+        }
     finally:
         await upload_svc.mark_completed(db_post.id)
 
@@ -161,7 +165,11 @@ async def edit_post(
             bg_tasks.add_task(make_media_permanent_bg, payload.media_ids)
             
         updated_post_id = await post_svc.update_post(existing_post)
-        return {"post_id": updated_post_id}
+        return {
+            "status": "success",
+            "message": "Post updated successfully",
+            "post_id": updated_post_id
+        }
     finally:
         await upload_svc.mark_completed(post_id)
 
@@ -216,10 +224,11 @@ async def comment_post(
     comment_svc = CommentService(db)
     post_interaction = await comment_svc.comment(post_id, current_user.id, comment)
     if not post_interaction:
-        return {"message": "Post not commented"}
+        return {"status": "error", "message": "Post not commented"}
     return {
+        "status": "success",
         "message": "Post commented successfully",
-        "post_interaction": post_interaction,
+        "comment_id": post_interaction.get("comment_id"),
     }
 
 
@@ -232,10 +241,11 @@ async def like_post(
     reaction_svc = ReactionService(db)
     post_reaction = await reaction_svc.like(post_id, current_user.id)
     if not post_reaction:
-        return {"message": "Post not liked"}
+        return {"status": "error", "message": "Post not liked"}
     return {
+        "status": "success",
         "message": "Post liked successfully",
-        "post_interaction": post_reaction,
+        "post_id": post_id,
     }
 
 
@@ -248,10 +258,11 @@ async def unlike_post(
     reaction_svc = ReactionService(db)
     post_reaction = await reaction_svc.unlike(post_id, current_user.id)
     if not post_reaction:
-        return {"message": "Post not unliked"}
+        return {"status": "error", "message": "Post not unliked"}
     return {
+        "status": "success",
         "message": "Post unliked successfully",
-        "post_interaction": post_reaction,
+        "post_id": post_id,
     }
 
 

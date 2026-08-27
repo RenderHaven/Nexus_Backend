@@ -19,25 +19,27 @@ class ReactionService:
         
     async def like(self, post_id: UUID, user_id: UUID):
         try:
-            event = {
-                "action": "like.created",
-                "post_id": str(post_id),
-                "user_id": str(user_id)
-            }
-            await kafka_manager.send_event(settings.KAFKA_INTERACTIONS_TOPIC, event)
-            return {"status": "event_published", "action": "like.created", "post_id": post_id, "user_id": user_id}
+            reaction = await self.post_interaction_store.update_like(post_id, user_id, True, commit=True)
+            if reaction:
+                await self.redis_store.update(str(post_id), str(user_id), like=True)
+                from app.domains.post.service import PostService
+                post_svc = PostService(self.db)
+                await post_svc.post_store.update_like_count(post_id, 1)
+
+            return {"status": "success", "action": "like.created", "post_id": str(post_id), "user_id": str(user_id)}
         except Exception as e:
             raise e
 
     async def unlike(self, post_id: UUID, user_id: UUID):
         try:
-            event = {
-                "action": "like.deleted",
-                "post_id": str(post_id),
-                "user_id": str(user_id)
-            }
-            await kafka_manager.send_event(settings.KAFKA_INTERACTIONS_TOPIC, event)
-            return {"status": "event_published", "action": "like.deleted", "post_id": post_id, "user_id": user_id}
+            reaction = await self.post_interaction_store.update_like(post_id, user_id, False, commit=True)
+            if reaction:
+                await self.redis_store.update(str(post_id), str(user_id), like=False)
+                from app.domains.post.service import PostService
+                post_svc = PostService(self.db)
+                await post_svc.post_store.update_like_count(post_id, -1)
+                
+            return {"status": "success", "action": "like.deleted", "post_id": str(post_id), "user_id": str(user_id)}
         except Exception as e:
             raise e
 

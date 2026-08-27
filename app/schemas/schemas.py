@@ -164,6 +164,8 @@ class Post(BaseModel):
 
 class PostIdResponse(BaseModel):
     post_id: UUID
+    status: str | None = None
+    message: str | None = None
 
 
 class PostCreate(BaseModel):

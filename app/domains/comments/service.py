@@ -3,7 +3,7 @@ from uuid import UUID
 from app.domains.comments.domain import Comment
 from app.domains.comments.storage import CommentStorage
 from app.domains.cursor.service import CursorService
-from app.kafka.client import kafka_manager
+
 from app.config import settings
 
 
@@ -81,47 +81,71 @@ class CommentService:
     async def comment(self, post_id: UUID, user_id: UUID, comment: str) -> dict:
         import uuid
         comment_id = uuid.uuid4()
-        event = {
+        
+        created_comment = await self.comment_store.add_comment(
+            post_id=post_id,
+            user_id=user_id,
+            body=comment,
+            comment_id=comment_id
+        )
+
+        from app.domains.post.service import PostService
+        post_svc = PostService(self.db)
+        await post_svc.post_store.update_comment_count(post_id, 1)
+
+        return {
+            "status": "success",
             "action": "comment_added",
-            "post_id": str(post_id),
-            "user_id": str(user_id),
-            "comment_id": str(comment_id),
-            "comment": comment
+            "comment_id": str(comment_id)
         }
-        await kafka_manager.send_event(settings.KAFKA_COMMENTS_TOPIC, event)
-        return {"status": "event_published", "action": "comment_added", "comment_id": str(comment_id)}
 
     async def add_comment_reply(self, user_id: UUID, comment_id: UUID, comment: str) -> dict:
         import uuid
         reply_id = uuid.uuid4()
-        event = {
+        
+        reply = await self.comment_store.add_comment_reply(
+            user_id=user_id,
+            comment_id=comment_id,
+            body=comment,
+            reply_id=reply_id
+        )
+
+        if reply and reply.post_id:
+            from app.domains.post.service import PostService
+            post_svc = PostService(self.db)
+            await post_svc.post_store.update_comment_count(reply.post_id, 1)
+
+        return {
+            "status": "success",
             "action": "reply_added",
-            "parent_id": str(comment_id),
-            "user_id": str(user_id),
-            "comment_id": str(reply_id),
-            "comment": comment
+            "comment_id": str(reply_id)
         }
-        await kafka_manager.send_event(settings.KAFKA_COMMENTS_TOPIC, event)
-        return {"status": "event_published", "action": "reply_added", "comment_id": str(reply_id)}
 
     async def edit_comment(self, user_id: UUID, comment_id: UUID, comment: str) -> dict:
-        event = {
+        edited_comment = await self.comment_store.edit_comment(
+            user_id=user_id,
+            comment_id=comment_id,
+            body=comment
+        )
+        return {
+            "status": "success",
             "action": "comment_edited",
-            "comment_id": str(comment_id),
-            "user_id": str(user_id),
-            "comment": comment
+            "comment_id": str(comment_id)
         }
-        await kafka_manager.send_event(settings.KAFKA_COMMENTS_TOPIC, event)
-        return {"status": "event_published", "action": "comment_edited", "comment_id": str(comment_id)}
 
     async def delete(self, user_id: UUID, comment_id: UUID) -> dict:
-        event = {
+        success, post_id = await self.comment_store.delete_comment(user_id, comment_id)
+        
+        if success and post_id:
+            from app.domains.post.service import PostService
+            post_svc = PostService(self.db)
+            await post_svc.post_store.update_comment_count(post_id, -1)
+
+        return {
+            "status": "success" if success else "failed",
             "action": "comment_deleted",
-            "comment_id": str(comment_id),
-            "user_id": str(user_id),
+            "comment_id": str(comment_id)
         }
-        await kafka_manager.send_event(settings.KAFKA_COMMENTS_TOPIC, event)
-        return {"status": "event_published", "action": "comment_deleted", "comment_id": str(comment_id)}
 
     async def process_batch(self, batch_messages):
         """Process a batch of comment events (DB + Redis update)."""
