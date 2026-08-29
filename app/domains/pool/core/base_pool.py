@@ -2,11 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 from app.domains.pool.schemas import PoolMember, PoolObject
 
-TObject = TypeVar("TObject", bound=PoolObject)
-TMember = TypeVar("TMember", bound=PoolMember)
 
-
-class BasePool(ABC, Generic[TObject, TMember]):
+class BasePool(ABC):
     pool_name: str
     pool_size: int = 100
 
@@ -14,22 +11,22 @@ class BasePool(ABC, Generic[TObject, TMember]):
     idle_age: int = -1
 
     @abstractmethod
-    async def get_objects(self) -> list[TObject]:
+    async def get_objects(self) -> list[PoolObject]:
         ...
 
     @abstractmethod
-    def score(self, obj: TObject) -> float:
+    def score(self, obj: PoolObject) -> float:
         ...
 
     @abstractmethod
-    def filter(self, obj: TObject) -> bool:
+    def filter(self, obj: PoolObject) -> bool:
         ...
 
     @abstractmethod
-    def to_member(self, obj: TObject) -> TMember:
+    def to_member(self, obj: PoolObject) -> PoolMember:
         ...
 
     @classmethod
     @abstractmethod
-    def member_type(cls) -> type[TMember]:
+    def member_type(cls) -> type[PoolMember]:
         ...

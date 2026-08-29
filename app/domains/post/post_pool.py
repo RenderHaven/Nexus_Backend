@@ -4,7 +4,7 @@ from app.domains.pool.core.base_pool import BasePool
 from app.domains.post.schemas import PostPoolObject,PostPoolMember
 
 
-class BasePostPool(BasePool[PostPoolObject, PostPoolMember]):
+class BasePostPool(BasePool):
 
     async def get_objects(self) -> list[PostPoolObject]:
         """
