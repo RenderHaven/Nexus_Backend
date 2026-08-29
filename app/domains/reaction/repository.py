@@ -26,7 +26,7 @@ class PostInteractionRepository:
         user_id: UUID,
         like: bool,
         commit: bool = True,
-        reaction_type: ReactionType = ReactionType.inspired,
+        reaction_type: ReactionType = ReactionType.liked,
     ) -> PostReaction | None:
         result = await self.db.execute(
             select(PostReaction)

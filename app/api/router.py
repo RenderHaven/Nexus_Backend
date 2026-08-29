@@ -8,7 +8,7 @@ from app.api.colleges import router as colleges_router
 from app.api.categories import router as categories_router
 from app.api.media import router as media_router
 from app.auth import router as auth_router
-
+from app.api.chats import router as chats_router
 api_router = APIRouter()
 
 api_router.include_router(
@@ -59,3 +59,8 @@ api_router.include_router(
     tags=["Media"],
 )
 
+api_router.include_router(
+    chats_router,
+    prefix="/chats",
+    tags=["Chats"],
+)

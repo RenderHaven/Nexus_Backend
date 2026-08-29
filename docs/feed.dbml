@@ -201,6 +201,10 @@ Table collaboration_responses {
   user_id uuid [not null]
   status collaboration_response_status [default: `interested`]
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
+  reviewed_at timestamp 
+  user_note text 
+  admin_note text
+
 
   Note: "An accepted response is what opens a conversation (see chat_participants.collaboration_response_id)."
 }
@@ -290,6 +294,7 @@ Table moderation_logs {
 Table chat_rooms {
   id uuid [primary key]
   post_id uuid [not null]
+  admin_id uuid [not null]
   name text // the collaboration post this room belongs to
   status conversation_status [default: `active`]
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
@@ -301,7 +306,6 @@ Table chat_participants {
   id uuid [primary key]
   chat_room_id uuid [not null]
   user_id uuid [not null]
-  collaboration_response_id uuid [not null] // the accepted response that earned this person their seat — this is the structural enforcement
   last_read_at timestamp
   joined_at timestamp [default: `CURRENT_TIMESTAMP`]
 
@@ -431,9 +435,9 @@ Ref: moderation_logs.post_id > posts.id
 Ref: moderation_logs.coach_id > users.id
 
 Ref: chat_rooms.post_id > posts.id
+Ref: chat_rooms.admin_id > users.id
 Ref: chat_participants.chat_room_id > chat_rooms.id
 Ref: chat_participants.user_id > users.id
-Ref: chat_participants.collaboration_response_id > collaboration_responses.id
 Ref: messages.chat_room_id > chat_rooms.id
 Ref: messages.sender_id > users.id
 

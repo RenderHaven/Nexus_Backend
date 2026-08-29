@@ -47,7 +47,7 @@ class ModerationAction(str, enum.Enum):
 
 
 class ReactionType(str, enum.Enum):
-    inspired = "inspired"
+    liked = "liked"
     curious = "curious"
     want_to_try = "want_to_try"
 

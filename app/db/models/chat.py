@@ -30,6 +30,7 @@ class ChatRoom(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), nullable=False)
+    admin_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     name = Column(Text, nullable=True)
     status = Column(Enum(ConversationStatus, name="conversation_status"), nullable=False, server_default=ConversationStatus.active.value, default=ConversationStatus.active)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -48,14 +49,11 @@ class ChatParticipant(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     chat_room_id = Column(UUID(as_uuid=True), ForeignKey("chat_rooms.id"), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    collaboration_response_id = Column(UUID(as_uuid=True), ForeignKey("collaboration_responses.id"), nullable=False)
     last_read_at = Column(DateTime(timezone=True), nullable=True)
     joined_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     chat_room = relationship("ChatRoom", back_populates="participants")
     user = relationship("User")
-    collaboration_response = relationship("CollaborationResponse")
-
 
 class Message(Base):
     __tablename__ = "messages"

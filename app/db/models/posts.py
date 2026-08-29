@@ -97,6 +97,8 @@ class CollaborationResponse(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     status = Column(Enum(CollaborationResponseStatus, name="collaboration_response_status"), nullable=False, server_default=CollaborationResponseStatus.interested.value, default=CollaborationResponseStatus.interested)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    user_note = Column(Text, nullable=True)
+    admin_note = Column(Text, nullable=True)
     post = relationship("Post", back_populates="collaboration_responses")
     user = relationship("User")

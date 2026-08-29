@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.reaction.redis import ReactionRedis
 from app.domains.reaction.repository import PostInteractionRepository
-from app.db.models import PostReaction, Post
+from app.db.models import PostReaction, ReactionType
 
 
 class ReactionStorage:
@@ -17,6 +17,7 @@ class ReactionStorage:
         result = await self.db.execute(
             select(PostReaction.post_id)
             .where(PostReaction.user_id == user_id)
+            .where(PostReaction.type== ReactionType.liked)
         )
         post_ids = [str(row[0]) for row in result.fetchall()]
 
