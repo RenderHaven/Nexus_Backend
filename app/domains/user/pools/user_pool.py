@@ -19,7 +19,8 @@ class BaseUserPool(BasePool):
         """
         return UserPoolMember(
             id=post.id,
-            type=post.type,
+            college_id=post.college_id,
+            username=post.username,
             created_at=post.created_at,
         )
 
@@ -28,7 +29,7 @@ class BaseUserPool(BasePool):
         return UserPoolMember
 
     @abstractmethod
-    async def get_posts(self) -> list[UserPoolObject]:
+    async def get_users(self) -> list[UserPoolObject]:
         """
         Return posts used to build this pool.
         """

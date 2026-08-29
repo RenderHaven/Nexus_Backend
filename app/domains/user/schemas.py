@@ -17,14 +17,15 @@ class UserBasic(UserMini):
 
 class UserPoolObject(PoolObject):
     id:UUID
+    username:str
     college_id:UUID
     created_at: datetime | None = None
-    name:str
 
 class UserPoolMember(PoolMember):
     id:UUID
+    username:str
     college_id:UUID
-    name:str
+    role:UserRole = UserRole.student
 
 class Author(BaseModel):
     model_config = ConfigDict(from_attributes=True)

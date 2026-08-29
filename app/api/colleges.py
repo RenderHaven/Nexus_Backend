@@ -27,20 +27,6 @@ async def get_my_college(
     return college
 
 
-@router.get("/{college_id}", response_model=CollegeBasic)
-async def get_college(
-    college_id: UUID,
-    db: AsyncSession = Depends(get_db),
-):
-    service = CollegeService(db)
-    college = await service.get_college(college_id)
-    if not college:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="College not found",
-        )
-    return college
-
 @router.get("/post_items", response_model=Paginated[PostPoolMember])
 async def get_my_college_post_items(
     cursor: str | None = None,
@@ -82,6 +68,20 @@ async def get_my_college_users(
         "items": pool_members,
         "next_cursor": next_cursor,
     }
+
+@router.get("/{college_id}", response_model=CollegeBasic)
+async def get_college(
+    college_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    service = CollegeService(db)
+    college = await service.get_college(college_id)
+    if not college:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="College not found",
+        )
+    return college
 
 @router.get("/{college_id}/post_items", response_model=Paginated[PostPoolMember])
 async def get_college_post_items(

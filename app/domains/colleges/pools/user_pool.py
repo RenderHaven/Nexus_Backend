@@ -16,7 +16,7 @@ class CollegeUserPool(BaseUserPool):
         return [UserPoolObject.model_validate(user) for user in users]
 
     def filter(self, user: UserPoolObject) -> bool:
-        return user.is_active
+        return True
 
     def score(self, user: UserPoolObject) -> float:
         return user.created_at.timestamp()
