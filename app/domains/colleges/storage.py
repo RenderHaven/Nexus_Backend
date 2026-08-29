@@ -3,8 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .schemas import CollegeBasic
 from .repository import CollegeRepository
 from .redis import CollegeRedisStore
-from app.domains.pool.service import PoolService
-from app.domains.colleges.pools.college_post_pool import CollegePostPool
 
 class CollegeStorage:
     def __init__(self, db: AsyncSession):

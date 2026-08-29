@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.models import Post, College
+from app.db.models import Post, College,User
 from .schemas import CollegeBasic
 
 class CollegeRepository:
@@ -23,3 +23,12 @@ class CollegeRepository:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def get_users(self, college_id: UUID, limit: int) -> list[User]:
+            result = await self.db.execute(
+                select(User)
+                .where(User.college_id == college_id)
+                .order_by(User.created_at.desc())
+                .limit(limit)
+            )
+            return list(result.scalars().all())

@@ -1,35 +1,34 @@
 from abc import abstractmethod
 
 from app.domains.pool.core.base_pool import BasePool
-from app.domains.post.schemas import PostPoolObject,PostPoolMember
+from app.domains.user.schemas import UserPoolObject,UserPoolMember
 
 
-class BasePostPool(BasePool):
+class BaseUserPool(BasePool):
 
-    async def get_objects(self) -> list[PostPoolObject]:
+    async def get_objects(self) -> list[UserPoolObject]:
         """
         Return posts that can be considered by this pool.
         """
-        return await self.get_posts()
+        return await self.get_users()
 
-    def to_member(self, post: PostPoolObject) -> PostPoolMember:
+    def to_member(self, post: UserPoolObject) -> UserPoolMember:
         """
         Convert a PostPoolObject into the lightweight member
         stored inside Redis.
         """
-        return PostPoolMember(
+        return UserPoolMember(
             id=post.id,
-            title=post.title,
             type=post.type,
             created_at=post.created_at,
         )
 
     @classmethod
-    def member_type(cls) -> type[PostPoolMember]:
-        return PostPoolMember
+    def member_type(cls) -> type[UserPoolMember]:
+        return UserPoolMember
 
     @abstractmethod
-    async def get_posts(self) -> list[PostPoolObject]:
+    async def get_posts(self) -> list[UserPoolObject]:
         """
         Return posts used to build this pool.
         """

@@ -3,6 +3,7 @@ from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 from app.db.models import UserRole, IdentityLevel
+from app.domains.pool.schemas import PoolMember, PoolObject
 
 class UserMini(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -13,6 +14,17 @@ class UserBasic(UserMini):
     email: str | None = None
     college_id: UUID | None = None
     role: UserRole
+
+class UserPoolObject(PoolObject):
+    id:UUID
+    college_id:UUID
+    created_at: datetime | None = None
+    name:str
+
+class UserPoolMember(PoolMember):
+    id:UUID
+    college_id:UUID
+    name:str
 
 class Author(BaseModel):
     model_config = ConfigDict(from_attributes=True)

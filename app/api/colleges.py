@@ -7,6 +7,7 @@ from app.db.models import User as UserModel
 from app.auth.deps import get_current_user
 
 from app.domains.colleges.schemas import CollegeBasic
+from app.domains.user.schemas import UserPoolMember
 from app.schemas.common import Paginated
 from app.domains.post.schemas import PostPoolMember
 router = APIRouter()
@@ -41,14 +42,37 @@ async def get_college(
     return college
 
 @router.get("/post_items", response_model=Paginated[PostPoolMember])
-async def get_my_college_pool_members(
+async def get_my_college_post_items(
+    cursor: str | None = None,
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    print(current_user.college_id)
+    service = CollegeService(db)
+    
+    pool_members, next_cursor = await service.get_post_pool_members(
+        college_id=current_user.college_id,
+        cursor_key=cursor,
+        limit=limit,
+    )
+    
+    return {
+        "items": pool_members,
+        "next_cursor": next_cursor,
+    }
+
+    
+
+@router.get("/user_items", response_model=Paginated[UserPoolMember])
+async def get_my_college_users(
     cursor: str | None = None,
     limit: int = 10,
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
     service = CollegeService(db)
-    pool_members, next_cursor = await service.get_pool_members(
+    pool_members, next_cursor = await service.get_user_pool_members(
         college_id=current_user.college_id,
         cursor_key=cursor,
         limit=limit,
@@ -60,14 +84,14 @@ async def get_my_college_pool_members(
     }
 
 @router.get("/{college_id}/post_items", response_model=Paginated[PostPoolMember])
-async def get_college_pool_members(
+async def get_college_post_items(
     college_id: UUID,
     cursor: str | None = None,
     limit: int = 10,
     db: AsyncSession = Depends(get_db),
 ):
     service = CollegeService(db)
-    pool_members, next_cursor = await service.get_pool_members(
+    pool_members, next_cursor = await service.get_post_pool_members(
         college_id=college_id,
         cursor_key=cursor,
         limit=limit,

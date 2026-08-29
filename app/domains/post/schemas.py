@@ -41,6 +41,7 @@ class PostPoolObject(PoolObject):
 
 class PostPoolMember(PoolMember):
     title: str | None = None
+    type:PostType|None=None
     created_at: datetime
     
 class PostCreate(PostBase):

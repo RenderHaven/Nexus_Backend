@@ -21,7 +21,7 @@ async def get_me(current_user: UserModel = Depends(get_current_user)):
 
 
 @router.get("/my_post_items", response_model=Paginated[PostPoolMember])
-async def get_my_user_pool_members(
+async def get_my_post_items(
     cursor: str | None = None,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
@@ -71,7 +71,7 @@ async def get_profile(
     return profile
 
 @router.get("/{user_id}/post_items", response_model=Paginated[PostPoolMember])
-async def get_user_pool_members(
+async def get_post_items(
     user_id: UUID,
     cursor: str | None = None,
     limit: int = 10,
