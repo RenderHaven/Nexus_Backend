@@ -9,7 +9,7 @@ class CollegePostPool(BasePostPool):
         self.pool_name = f"college:posts:{college_id}"
 
     async def get_posts(self) -> list[PostPoolObject]:
-        posts = await self.repository.get_posts_ids(
+        posts = await self.repository.get_posts(
             college_id=self.college_id,
             limit=self.pool_size,
         )

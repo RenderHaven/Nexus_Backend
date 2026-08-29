@@ -14,7 +14,7 @@ from app.domains.post.service import PostService
 from app.domains.types.enum import PostType
 from app.domains.types.service import PostTypeService
 from app.schemas.common import Paginated
-from app.domains.post.schemas import Post, PostIdResponse
+from app.domains.post.schemas import Post, PostIdResponse, PostPoolMember
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from app.domains.post.schemas import PostCreate, PostUpdate, MediaType
@@ -252,8 +252,8 @@ async def unlike_post(
     }
 
 
-@router.get("/type/{post_type}/post_ids", response_model=Paginated[UUID])
-async def get_type_post_ids(
+@router.get("/type/{post_type}/post_items", response_model=Paginated[PostPoolMember])
+async def get_type_post_items(
     post_type: PostType,
     user_id: UUID | None = Depends(get_current_user_id_optional),
     cursor: str | None = None,
@@ -261,18 +261,18 @@ async def get_type_post_ids(
     db: AsyncSession = Depends(get_db),
 ):
     post_type_svc = PostTypeService(db)
-    post_ids, next_cursor = await post_type_svc.get_type_post_ids(
+    post_items, next_cursor = await post_type_svc.get_pool_members(
         post_type=post_type,
         user_id=user_id,
         cursor_key=cursor,
         limit=limit,
     )
-    if not post_ids:
+    if not post_items:
         return {
             "items": [],
             "next_cursor": None,
         }
     return {
-        "items": post_ids,
+        "items": post_items,
         "next_cursor": next_cursor,
     }

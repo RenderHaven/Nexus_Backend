@@ -32,7 +32,7 @@ class PostTypeService:
         for pool in self.type_pools.values():
             await self.pool_service.build(pool)
 
-    async def get_type_post_ids(
+    async def get_pool_members(
         self,
         post_type: PostType,
         user_id: UUID | None = None,
@@ -46,12 +46,12 @@ class PostTypeService:
 
         extra_data = {"user_id": str(user_id)} if user_id else None
 
-        post_ids, new_cursor_key = await self.pool_service.get_post_ids(
+        post_items, new_cursor_key = await self.pool_service.get_pool_members(
             group_or_pool=pool,
             cursor_key=cursor_key,
             limit=limit,
             extra_cursor_data=extra_data
         )
 
-        return post_ids, new_cursor_key
+        return post_items, new_cursor_key
 

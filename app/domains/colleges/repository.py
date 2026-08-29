@@ -15,7 +15,7 @@ class CollegeRepository:
             return None
         return CollegeBasic.model_validate(college)
 
-    async def get_posts_ids(self, college_id: UUID, limit: int) -> list[Post]:
+    async def get_posts(self, college_id: UUID, limit: int) -> list[Post]:
         result = await self.db.execute(
             select(Post)
             .where(Post.college_id == college_id)
