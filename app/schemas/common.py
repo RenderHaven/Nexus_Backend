@@ -18,5 +18,7 @@ class College(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     name: str
+    tagline: str | None = None
+    location: str | None = None
     about: str | None = None
     created_at: datetime | None = None

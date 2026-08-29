@@ -9,7 +9,7 @@ class UserPostPool(BasePool):
     def __init__(self, user_id: UUID, repository):
         self.user_id = user_id
         self.repository = repository
-
+        self.idle_age=2*60*60
         self.pool_name = f"user:posts:{user_id}"
 
     async def get_posts(self) -> list[PoolPost]:

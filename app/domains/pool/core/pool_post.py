@@ -8,6 +8,7 @@ class PoolPost(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    name: str | None = Field(default=None, validation_alias=AliasChoices("name", "title"))
 
     type: str
     category_id: UUID | None = None

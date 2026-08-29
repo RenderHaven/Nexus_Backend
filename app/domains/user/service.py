@@ -33,15 +33,15 @@ class UserService:
         except Exception as e:
             raise e
 
-    async def get_post_ids(self, user_id: UUID, cursor_key: str | None = None, limit: int = 10):
+    async def get_pool_members(self, user_id: UUID, cursor_key: str | None = None, limit: int = 10):
 
         pool = UserPostPool(user_id=user_id, repository=self.user_repo)
         
-        post_ids, new_cursor_key = await self.pool_service.get_post_ids(
+        pool_members, new_cursor_key = await self.pool_service.get_pool_members(
             group_or_pool=pool,
             cursor_key=cursor_key,
             limit=limit,
             extra_cursor_data={"user_id": str(user_id)}
         )
 
-        return post_ids, new_cursor_key
+        return pool_members, new_cursor_key

@@ -1,4 +1,5 @@
 from app.domains.pool.core.base_pool import BasePool
+from app.domains.pool.schemas import ZSetCursor
 from app.redis.keys import RedisKeys
 from app.redis.client import get_redis
 from typing import Iterable
@@ -12,25 +13,24 @@ class PoolStore:
     def _key(self, pool_name: str) -> str:
         return RedisKeys.pool(pool_name)
 
-    def _get_ttl(self, pool: BasePool) -> int | None:
-        """
-        Return the pool TTL.
+    async def _touch(self, pool: BasePool) -> None:
+        if pool.refresh_time > 0:
+            return
 
-        If both refresh_time and idle_age are configured,
-        the smaller value is used.
-
-        <= 0 means disabled.
-        """
-        times = [
-            value
-            for value in (
-                pool.refresh_time,
+        if pool.idle_age > 0:
+            await self.redis.expire(
+                self._key(pool.pool_name),
                 pool.idle_age,
             )
-            if value > 0
-        ]
 
-        return min(times) if times else None
+    def _get_ttl(self, pool: BasePool) -> int | None:
+        if pool.refresh_time > 0:
+            return pool.refresh_time
+
+        if pool.idle_age > 0:
+            return pool.idle_age
+
+        return None
 
     async def create(
         self,
@@ -88,31 +88,94 @@ class PoolStore:
                 mapping,
             )
 
-    async def top(
+    async def get_many_with_cursor(
         self,
         pool: BasePool,
-        offset: int = 0,
+        cursor: ZSetCursor | dict | None = None,
         limit: int = 20,
-    ) -> list[str]:
-        """Get the highest-ranked post ids."""
-        return await self.redis.zrevrange(
-            self._key(pool.pool_name),
-            offset,
-            limit + offset - 1,
+    ) -> tuple[list[tuple[str, float]],ZSetCursor|None]:
+        """
+        Get highest-ranked posts starting after the specified cursor.
+        Returns list of (member/post_id, score) tuples.
+        """
+        key = self._key(pool.pool_name)
+
+        if isinstance(cursor, ZSetCursor):
+            cursor_score = cursor.score
+            cursor_member = cursor.member
+        elif isinstance(cursor, dict):
+            cursor_score = cursor.get("score")
+            cursor_member = cursor.get("member")
+        else:
+            cursor_score = None
+            cursor_member = None
+
+        if cursor_score is None or cursor_member is None:
+            raw_results = await self.redis.zrevrange(
+                key,
+                0,
+                limit - 1,
+                withscores=True,
+            )
+
+            await self._touch(pool)
+
+            last = raw_results[-1] if raw_results else None
+            new_cursor = ZSetCursor(member=last[0], score=float(last[1])) if last else None
+
+            return [(member, float(score)) for member, score in raw_results], new_cursor
+
+        rank = await self.redis.zrevrank(
+            key,
+            cursor_member,
         )
 
-    async def top_with_scores(
-        self,
-        pool: BasePool,
-        limit: int = 20,
-    ) -> list[tuple[str, float]]:
-        """Get highest-ranked posts with scores."""
-        return await self.redis.zrevrange(
-            self._key(pool.pool_name),
-            0,
-            limit - 1,
+        if rank is not None:
+            raw_results = await self.redis.zrevrange(
+                key,
+                rank + 1,
+                rank + limit,
+                withscores=True,
+            )
+
+            await self._touch(pool)
+
+            last = raw_results[-1] if raw_results else None
+            new_cursor = ZSetCursor(member=last[0], score=float(last[1])) if last else None
+
+            return [(member, float(score)) for member, score in raw_results], new_cursor
+
+        candidates = await self.redis.zrevrangebyscore(
+            key,
+            max=cursor_score,
+            min="-inf",
             withscores=True,
         )
+
+        results: list[tuple[str, float]] = []
+
+        for member, score in candidates:
+            score_val = float(score)
+
+            if (
+                score_val < cursor_score
+                or (
+                    score_val == cursor_score
+                    and member < cursor_member
+                )
+            ):
+                results.append((member, score_val))
+
+                if len(results) == limit:
+                    break
+
+        await self._touch(pool)
+
+        last = results[-1] if results else None
+        new_cursor = ZSetCursor(member=last[0], score=last[1]) if last else None
+        
+        return results, new_cursor
+
 
     async def remove(
         self,

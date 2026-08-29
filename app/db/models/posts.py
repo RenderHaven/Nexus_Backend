@@ -70,8 +70,6 @@ class Post(Base):
     restricted_college = relationship("College", foreign_keys=[restricted_to_college_id])
     media = relationship("PostMedia", back_populates="post", cascade="all, delete-orphan")
     collaboration_responses = relationship("CollaborationResponse", back_populates="post", cascade="all, delete-orphan")
-    event_attendees = relationship("EventAttendee", back_populates="post", cascade="all, delete-orphan")
-    opportunity_clicks = relationship("OpportunityClick", back_populates="post", cascade="all, delete-orphan")
     reactions = relationship("PostReaction", back_populates="post", cascade="all, delete-orphan")
     comments = relationship("PostComment", back_populates="post", cascade="all, delete-orphan")
     moderation_logs = relationship("ModerationLog", back_populates="post", cascade="all, delete-orphan")
@@ -101,29 +99,4 @@ class CollaborationResponse(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     post = relationship("Post", back_populates="collaboration_responses")
-    user = relationship("User")
-
-
-class EventAttendee(Base):
-    __tablename__ = "event_attendees"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    registered_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    attended_at = Column(DateTime(timezone=True), nullable=True)
-
-    post = relationship("Post", back_populates="event_attendees")
-    user = relationship("User")
-
-
-class OpportunityClick(Base):
-    __tablename__ = "opportunity_clicks"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    clicked_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-    post = relationship("Post", back_populates="opportunity_clicks")
     user = relationship("User")

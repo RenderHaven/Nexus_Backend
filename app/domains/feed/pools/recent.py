@@ -5,9 +5,12 @@ from app.domains.pool.core.pool_post import PoolPost
 class RecentPool(BasePool):
     pool_name = "recent"
 
+    
+
     def __init__(self, db_repo):
         super().__init__()
         self.db_repo = db_repo
+        self.refresh_time=2*60*60
     
     def filter(self, post: PoolPost) -> bool:
         return post.is_active == True

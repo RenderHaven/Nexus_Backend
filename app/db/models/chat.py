@@ -30,6 +30,7 @@ class ChatRoom(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), nullable=False)
+    name = Column(Text, nullable=True)
     status = Column(Enum(ConversationStatus, name="conversation_status"), nullable=False, server_default=ConversationStatus.active.value, default=ConversationStatus.active)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

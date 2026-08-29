@@ -8,6 +8,7 @@ from app.auth.deps import get_current_user
 
 from app.domains.colleges.schemas import CollegeBasic
 from app.schemas.common import Paginated
+from app.domains.pool.schemas import PoolMember
 router = APIRouter()
 
 @router.get("/my_college",response_model=CollegeBasic)
@@ -39,40 +40,40 @@ async def get_college(
         )
     return college
 
-@router.get("/post_ids", response_model=Paginated[UUID])
-async def get_my_college_posts(
+@router.get("/post_items", response_model=Paginated[PoolMember])
+async def get_my_college_pool_members(
     cursor: str | None = None,
     limit: int = 10,
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
     service = CollegeService(db)
-    posts, next_cursor = await service.get_post_ids(
+    pool_members, next_cursor = await service.get_pool_members(
         college_id=current_user.college_id,
         cursor_key=cursor,
         limit=limit,
     )
     
     return {
-        "items": posts,
+        "items": pool_members,
         "next_cursor": next_cursor,
     }
 
-@router.get("/{college_id}/post_ids", response_model=Paginated[UUID])
-async def get_college_posts(
+@router.get("/{college_id}/post_items", response_model=Paginated[PoolMember])
+async def get_college_pool_members(
     college_id: UUID,
     cursor: str | None = None,
     limit: int = 10,
     db: AsyncSession = Depends(get_db),
 ):
     service = CollegeService(db)
-    posts, next_cursor = await service.get_post_ids(
+    pool_members, next_cursor = await service.get_pool_members(
         college_id=college_id,
         cursor_key=cursor,
         limit=limit,
     )
     
     return {
-        "items": posts,
+        "items": pool_members,
         "next_cursor": next_cursor,
     }

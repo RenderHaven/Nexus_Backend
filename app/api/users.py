@@ -10,6 +10,7 @@ from app.auth.deps import get_current_user,get_current_user_id
 
 from app.domains.user.schemas import UserBasic
 from app.schemas.common import Paginated
+from app.domains.pool.schemas import PoolMember
 
 router = APIRouter()
 
@@ -19,8 +20,8 @@ async def get_me(current_user: UserModel = Depends(get_current_user)):
     return UserSchema.model_validate(current_user)
 
 
-@router.get("/my_post_ids", response_model=Paginated[UUID])
-async def get_my_user_posts(
+@router.get("/my_post_items", response_model=Paginated[PoolMember])
+async def get_my_user_pool_members(
     cursor: str | None = None,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
@@ -28,14 +29,14 @@ async def get_my_user_posts(
 ):
     service = UserService(db)
     print(current_user_id)
-    post_ids, next_cursor = await service.get_post_ids(
+    pool_members, next_cursor = await service.get_pool_members(
         user_id=current_user_id,
         cursor_key=cursor,
         limit=limit,
     )
     
     return {
-        "items": post_ids,
+        "items": pool_members,
         "next_cursor": next_cursor,
     }
 
@@ -69,21 +70,21 @@ async def get_profile(
         )
     return profile
 
-@router.get("/{user_id}/post_ids", response_model=Paginated[UUID])
-async def get_user_posts(
+@router.get("/{user_id}/post_items", response_model=Paginated[PoolMember])
+async def get_user_pool_members(
     user_id: UUID,
     cursor: str | None = None,
     limit: int = 10,
     db: AsyncSession = Depends(get_db),
 ):
     service = UserService(db)
-    post_ids, next_cursor = await service.get_post_ids(
+    pool_members, next_cursor = await service.get_pool_members(
         user_id=user_id,
         cursor_key=cursor,
         limit=limit,
     )
     
     return {
-        "items": post_ids,
+        "items": pool_members,
         "next_cursor": next_cursor,
     }

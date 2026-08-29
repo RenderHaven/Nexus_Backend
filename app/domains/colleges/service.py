@@ -16,14 +16,14 @@ class CollegeService:
         return await self.storage.get_college(college_id)
 
 
-    async def get_post_ids(self, college_id: UUID, cursor_key: str | None = None, limit: int = 10):
+    async def get_pool_members(self, college_id: UUID, cursor_key: str | None = None, limit: int = 10):
         pool = CollegePostPool(college_id=college_id, repository=self.college_repo)
         
-        post_ids, new_cursor_key = await self.pool_service.get_post_ids(
+        pool_members, new_cursor_key = await self.pool_service.get_pool_members(
             group_or_pool=pool,
             cursor_key=cursor_key,
             limit=limit,
             extra_cursor_data={"college_id": str(college_id)}
         )
 
-        return post_ids, new_cursor_key
+        return pool_members, new_cursor_key

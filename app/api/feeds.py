@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.domains.cursor.service import CursorService
 from app.domains.feed.service import FeedService
 from app.schemas.common import Paginated
+from app.domains.pool.schemas import PoolMember
 
 
 router = APIRouter()
@@ -54,8 +55,8 @@ async def get_feed_groups(
     }
 
 
-@router.get("/post_ids/{grp_name}", response_model=Paginated[UUID])
-async def get_feed_post_ids(
+@router.get("/post_items/{grp_name}", response_model=Paginated[PoolMember])
+async def get_feed_pool_members(
     grp_name: str,
     user_id: User | None = Depends(
         get_current_user_id_optional
@@ -65,20 +66,20 @@ async def get_feed_post_ids(
 ):
     feed_svc = FeedService(db)
 
-    post_ids, next_cursor = await feed_svc.get_post_ids(
+    pool_members, next_cursor = await feed_svc.get_pool_members(
         grp_name,
         user_id,
         cursor,
     )
 
-    if not post_ids:
+    if not pool_members:
         return {
             "items": [],
             "next_cursor": None,
         }
 
     return {
-        "items": post_ids,
+        "items": pool_members,
         "next_cursor": next_cursor,
     }
 
