@@ -1,6 +1,6 @@
 from uuid import UUID
 from app.domains.pool.core.base_pool import BasePool
-from app.domains.pool.core.pool_post import PoolPost
+from app.domains.post.schemas import PoolPost
 
 class CollegePostPool(BasePool):
     def __init__(self, college_id: UUID, repository):

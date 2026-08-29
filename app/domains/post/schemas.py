@@ -1,8 +1,9 @@
 from typing import Any
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field,AliasChoices
 from app.db.models import PostType, PostStatus, ModerationStatus, ActionStatus, MediaType
+from app.domains.pool.schemas import PoolObject
 from app.domains.user.schemas import Author
 from app.schemas.common import Category, College
 
@@ -26,6 +27,22 @@ class PostBase(BaseModel):
     restricted_to_college_id: UUID | None = None
     resources: list[PostResource] | list[dict[str, Any]] | None = None
     action_status: ActionStatus | None = None
+
+class PoolPost(PoolObject):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str | None = Field(default=None, validation_alias=AliasChoices("name", "title"))
+
+    type: str
+    category_id: UUID | None = None
+    user_id: UUID = Field(validation_alias=AliasChoices("user_id", "created_by"))
+
+    created_at: datetime
+
+    is_active: bool
+
+    engagement_score: float = 0.0
 
 class PostCreate(PostBase):
     media_ids: list[str] = Field(default_factory=list)

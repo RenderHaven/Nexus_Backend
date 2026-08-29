@@ -1,5 +1,5 @@
 from app.domains.pool.core.base_pool import BasePool
-from app.domains.pool.core.pool_post import PoolPost
+from app.domains.post.schemas import PoolPost
 
 
 class PopularPool(BasePool):

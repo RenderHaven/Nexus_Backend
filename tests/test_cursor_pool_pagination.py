@@ -5,7 +5,7 @@ from app.domains.pool.schemas import ZSetCursor
 from app.domains.pool.core.base_pool import BasePool
 from app.domains.pool.core.pool_group import PoolGroup
 from app.domains.pool.core.pool_config import PoolConfig
-from app.domains.pool.core.pool_post import PoolPost
+from app.domains.post.schemas import PoolPost
 from app.domains.pool.redis import PoolStore
 from app.domains.pool.service import PoolService
 
