@@ -7,8 +7,8 @@ from app.domains.cursor.service import CursorService
 from app.domains.feed.pools.popular import PopularPool
 from app.domains.feed.pools.recent import RecentPool
 from app.domains.feed.repository import FeedRepository
-from app.domains.pool.core.base_pool import BasePool
-from app.domains.pool.core.pool_group import PoolGroup
+from app.domains.post.post_pool import BasePostPool
+from app.domains.pool.core.schemas import PoolGroup
 from app.domains.pool.service import PoolService
 from app.domains.post.service import PostService
 from app.domains.user.service import UserService
@@ -33,7 +33,7 @@ class FeedService:
         self.cursor_svc = CursorService()
 
         # Feed groups
-        self.feed_grps: dict[str, BasePool | PoolGroup] = {
+        self.feed_grps: dict[str, BasePostPool | PoolGroup] = {
             "popular": PopularPool(db_repo=self.feed_repo),
             "recent" : RecentPool(db_repo=self.feed_repo),
         }

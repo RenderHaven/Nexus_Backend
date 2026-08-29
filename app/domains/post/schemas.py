@@ -3,7 +3,7 @@ from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field,AliasChoices
 from app.db.models import PostType, PostStatus, ModerationStatus, ActionStatus, MediaType
-from app.domains.pool.schemas import PoolObject
+from app.domains.pool.schemas import PoolMember, PoolObject
 from app.domains.user.schemas import Author
 from app.schemas.common import Category, College
 
@@ -28,7 +28,7 @@ class PostBase(BaseModel):
     resources: list[PostResource] | list[dict[str, Any]] | None = None
     action_status: ActionStatus | None = None
 
-class PoolPost(PoolObject):
+class PostPoolObject(PoolObject):
     type: str
     category_id: UUID | None = None
     user_id: UUID = Field(validation_alias=AliasChoices("user_id", "created_by"))
@@ -39,6 +39,10 @@ class PoolPost(PoolObject):
 
     engagement_score: float = 0.0
 
+class PostPoolMember(PoolMember):
+    title: str | None = None
+    created_at: datetime
+    
 class PostCreate(PostBase):
     media_ids: list[str] = Field(default_factory=list)
 

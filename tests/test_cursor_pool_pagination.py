@@ -3,9 +3,9 @@ import asyncio
 
 from app.domains.pool.schemas import ZSetCursor
 from app.domains.pool.core.base_pool import BasePool
-from app.domains.pool.core.pool_group import PoolGroup
+from app.domains.pool.core.schemas import PoolGroup
 from app.domains.pool.core.pool_config import PoolConfig
-from app.domains.post.schemas import PoolPost
+from app.domains.post.schemas import PostPoolObject
 from app.domains.pool.redis import PoolStore
 from app.domains.pool.service import PoolService
 
@@ -14,13 +14,13 @@ class DummyPool(BasePool):
     def __init__(self, name="test_pool"):
         self.pool_name = name
 
-    def filter(self, post: PoolPost) -> bool:
+    def filter(self, post: PostPoolObject) -> bool:
         return True
 
-    def score(self, post: PoolPost) -> float:
+    def score(self, post: PostPoolObject) -> float:
         return post.engagement_score
 
-    async def get_posts(self) -> list[PoolPost]:
+    async def get_posts(self) -> list[PostPoolObject]:
         return []
 
 

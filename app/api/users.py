@@ -10,7 +10,7 @@ from app.auth.deps import get_current_user,get_current_user_id
 
 from app.domains.user.schemas import UserBasic
 from app.schemas.common import Paginated
-from app.domains.pool.schemas import PoolMember
+from app.domains.post.schemas import PostPoolMember
 
 router = APIRouter()
 
@@ -20,7 +20,7 @@ async def get_me(current_user: UserModel = Depends(get_current_user)):
     return UserSchema.model_validate(current_user)
 
 
-@router.get("/my_post_items", response_model=Paginated[PoolMember])
+@router.get("/my_post_items", response_model=Paginated[PostPoolMember])
 async def get_my_user_pool_members(
     cursor: str | None = None,
     limit: int = 50,
@@ -70,7 +70,7 @@ async def get_profile(
         )
     return profile
 
-@router.get("/{user_id}/post_items", response_model=Paginated[PoolMember])
+@router.get("/{user_id}/post_items", response_model=Paginated[PostPoolMember])
 async def get_user_pool_members(
     user_id: UUID,
     cursor: str | None = None,

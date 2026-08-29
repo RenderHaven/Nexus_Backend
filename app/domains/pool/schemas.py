@@ -2,11 +2,9 @@ from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field ,AliasChoices
 
-
+    
 class PoolMember(BaseModel):
     id: UUID
-    type: str
-    created_at: datetime
 
 class ZSetCursor(BaseModel):
     model_config = ConfigDict(from_attributes=True)

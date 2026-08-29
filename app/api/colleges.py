@@ -8,7 +8,7 @@ from app.auth.deps import get_current_user
 
 from app.domains.colleges.schemas import CollegeBasic
 from app.schemas.common import Paginated
-from app.domains.pool.schemas import PoolMember
+from app.domains.post.schemas import PostPoolMember
 router = APIRouter()
 
 @router.get("/my_college",response_model=CollegeBasic)
@@ -40,7 +40,7 @@ async def get_college(
         )
     return college
 
-@router.get("/post_items", response_model=Paginated[PoolMember])
+@router.get("/post_items", response_model=Paginated[PostPoolMember])
 async def get_my_college_pool_members(
     cursor: str | None = None,
     limit: int = 10,
@@ -59,7 +59,7 @@ async def get_my_college_pool_members(
         "next_cursor": next_cursor,
     }
 
-@router.get("/{college_id}/post_items", response_model=Paginated[PoolMember])
+@router.get("/{college_id}/post_items", response_model=Paginated[PostPoolMember])
 async def get_college_pool_members(
     college_id: UUID,
     cursor: str | None = None,
