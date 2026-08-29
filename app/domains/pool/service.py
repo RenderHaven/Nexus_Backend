@@ -24,7 +24,6 @@ class PoolService:
 
             member = PoolMember(
                 id=post.id,
-                name=post.name,
                 type=post.type,
                 created_at=post.created_at
             )

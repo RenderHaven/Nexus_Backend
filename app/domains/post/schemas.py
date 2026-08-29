@@ -29,11 +29,6 @@ class PostBase(BaseModel):
     action_status: ActionStatus | None = None
 
 class PoolPost(PoolObject):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    title: str | None = Field(default=None, validation_alias=AliasChoices("name", "title"))
-
     type: str
     category_id: UUID | None = None
     user_id: UUID = Field(validation_alias=AliasChoices("user_id", "created_by"))

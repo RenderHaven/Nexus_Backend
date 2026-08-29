@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field ,AliasChoices
 
 class PoolMember(BaseModel):
     id: UUID
-    name: str | None = None
     type: str
     created_at: datetime
 
