@@ -18,7 +18,7 @@ from app.db.models import (
     ReactionType,
     MediaType,
     ActionStatus,
-    CollaborationResponseStatus,
+    CollaborationRequestStatus,
     ConversationStatus,
     MessageType,
 )
@@ -39,13 +39,13 @@ class UserOpenTo(BaseModel):
     user_id: UUID
     label: str
 
-class CollaborationResponse(BaseModel):
+class CollaborationRequest(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     post_id: UUID
     user_id: UUID
-    status: CollaborationResponseStatus = CollaborationResponseStatus.interested
+    status: CollaborationRequestStatus = CollaborationRequestStatus.interested
     created_at: datetime | None = None
 
 class EventAttendee(BaseModel):

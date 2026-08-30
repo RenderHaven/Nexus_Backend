@@ -30,7 +30,7 @@ from .enums import (
     ModerationStatus,
     ModerationAction,
     MediaType,
-    CollaborationResponseStatus,
+    CollaborationRequestStatus,
 )
 
 class Post(Base):
@@ -69,7 +69,7 @@ class Post(Base):
     reviewer = relationship("User", foreign_keys=[reviewed_by], back_populates="reviewed_posts")
     restricted_college = relationship("College", foreign_keys=[restricted_to_college_id])
     media = relationship("PostMedia", back_populates="post", cascade="all, delete-orphan")
-    collaboration_responses = relationship("CollaborationResponse", back_populates="post", cascade="all, delete-orphan")
+    collaboration_requests = relationship("CollaborationRequest", back_populates="post", cascade="all, delete-orphan")
     reactions = relationship("PostReaction", back_populates="post", cascade="all, delete-orphan")
     comments = relationship("PostComment", back_populates="post", cascade="all, delete-orphan")
     moderation_logs = relationship("ModerationLog", back_populates="post", cascade="all, delete-orphan")
@@ -89,16 +89,16 @@ class PostMedia(Base):
     post = relationship("Post", back_populates="media")
 
 
-class CollaborationResponse(Base):
-    __tablename__ = "collaboration_responses"
+class CollaborationRequest(Base):
+    __tablename__ = "collaboration_requests"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    status = Column(Enum(CollaborationResponseStatus, name="collaboration_response_status"), nullable=False, server_default=CollaborationResponseStatus.interested.value, default=CollaborationResponseStatus.interested)
+    status = Column(Enum(CollaborationRequestStatus, name="collaboration_request_status"), nullable=False, server_default=CollaborationRequestStatus.requested.value, default=CollaborationRequestStatus.requested)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     user_note = Column(Text, nullable=True)
     admin_note = Column(Text, nullable=True)
-    post = relationship("Post", back_populates="collaboration_responses")
+    post = relationship("Post", back_populates="collaboration_requests")
     user = relationship("User")

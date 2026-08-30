@@ -79,8 +79,8 @@ Enum action_status {
   closed
 }
 
-Enum collaboration_response_status {
-  interested
+Enum collaboration_request_status {
+  requested
   accepted
   rejected
 }
@@ -195,18 +195,18 @@ Table post_media {
 // gates chat access; not just descriptive content)
 // =========================
 
-Table collaboration_responses {
+Table collaboration_requests {
   id uuid [primary key]
   post_id uuid [not null]
   user_id uuid [not null]
-  status collaboration_response_status [default: `interested`]
+  status collaboration_request_status [default: `requested`]
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
   reviewed_at timestamp 
   user_note text 
   admin_note text
 
 
-  Note: "An accepted response is what opens a conversation (see chat_participants.collaboration_response_id)."
+  Note: "An accepted response is what opens a conversation (see chat_participants.collaboration_request_id)."
 }
 
 // =========================
@@ -309,7 +309,7 @@ Table chat_participants {
   last_read_at timestamp
   joined_at timestamp [default: `CURRENT_TIMESTAMP`]
 
-  Note: "unique(chat_room_id, user_id). A row can only be inserted here if collaboration_response_id points to a response with status = accepted — a user cannot be a participant without having gone through the collaboration flow. Every accepted responder gets their own row, tied to their own response, all pointing at the same chat_room."
+  Note: "unique(chat_room_id, user_id). A row can only be inserted here if collaboration_request_id points to a response with status = accepted — a user cannot be a participant without having gone through the collaboration flow. Every accepted responder gets their own row, tied to their own response, all pointing at the same chat_room."
 }
 
 Table messages {
@@ -420,8 +420,8 @@ Ref: posts.reviewed_by > users.id
 Ref: posts.restricted_to_college_id > colleges.id
 Ref: post_media.post_id > posts.id
 
-Ref: collaboration_responses.post_id > posts.id
-Ref: collaboration_responses.user_id > users.id
+Ref: collaboration_requests.post_id > posts.id
+Ref: collaboration_requests.user_id > users.id
 
 Ref: post_reactions.post_id > posts.id
 Ref: post_reactions.user_id > users.id

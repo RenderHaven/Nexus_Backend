@@ -84,6 +84,7 @@ alembic/versions/*.pyc
 # ==========================
 # Docker
 # ==========================
+docker-compose.yml
 docker-data/
 *.pid
 

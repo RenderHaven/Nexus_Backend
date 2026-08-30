@@ -63,8 +63,8 @@ class ActionStatus(str, enum.Enum):
     closed = "closed"
 
 
-class CollaborationResponseStatus(str, enum.Enum):
-    interested = "interested"
+class CollaborationRequestStatus(str, enum.Enum):
+    requested = "requested"
     accepted = "accepted"
     rejected = "rejected"
 

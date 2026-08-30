@@ -4,7 +4,7 @@ from .enums import *
 from .users import User, UserInterest, UserOpenTo
 from .colleges import College
 from .categories import Category
-from .posts import Post, PostMedia, CollaborationResponse
+from .posts import Post, PostMedia, CollaborationRequest
 from .comments import PostComment, CommentEditLog
 from .reactions import PostReaction
 from .moderation import ModerationLog
