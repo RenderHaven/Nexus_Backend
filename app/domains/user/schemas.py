@@ -1,3 +1,4 @@
+from app.domains.user.profile_schemas import UserProfile
 from typing import Any
 from datetime import datetime
 from uuid import UUID
@@ -37,5 +38,9 @@ class Author(BaseModel):
 class User(UserBasic):
     total_xp: int = 0
     current_level: IdentityLevel = IdentityLevel.spark
-    profile: dict[str, Any] = Field(default_factory=dict)
+    profile: UserProfile = Field(default_factory=UserProfile)
     created_at: datetime | None = None
+
+    
+
+    

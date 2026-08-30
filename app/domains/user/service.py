@@ -45,3 +45,10 @@ class UserService:
         )
 
         return pool_members, new_cursor_key
+    async def update_profile(self, user_id: UUID, raw_profile: dict):
+        from app.domains.user.profile_schemas import UserProfile
+        validated = UserProfile.model_validate(raw_profile)
+        await self.user_repo.update_profile_json(user_id, validated.model_dump(mode="json"))
+        # Clear redis cache to ensure fresh fetch
+        await self.user_store.user_redis_store.delete(user_id)
+        return validated

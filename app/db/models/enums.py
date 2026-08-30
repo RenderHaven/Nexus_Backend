@@ -67,6 +67,7 @@ class CollaborationRequestStatus(str, enum.Enum):
     requested = "requested"
     accepted = "accepted"
     rejected = "rejected"
+    revoked="revoked"
 
 
 class ConversationStatus(str, enum.Enum):

@@ -105,3 +105,15 @@ class ReactionService:
         
         await pipeline.execute()
         print(f"Reaction Redis build completed. Restored {len(active_likes)} likes across {len(likes_by_user)} users.")
+
+class LikeService:
+    def __init__(self, db):
+        self.db = db
+        from app.domains.reaction.storage import ReactionStorage
+        self.storage = ReactionStorage(db)
+
+    async def are_liked(self, post_ids: list[UUID | str], user_id: UUID | str):
+        return await self.storage.are_liked(post_ids, user_id)
+
+    async def is_liked(self, post_id: UUID | str, user_id: UUID | str):
+        return await self.storage.is_liked(post_id, user_id)

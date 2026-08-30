@@ -6,10 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user
 from app.auth.deps import get_current_user_id_optional
 from app.db.models import User
+from app.db.models.enums import CollaborationRequestStatus
 from app.db.session import get_db
 from app.domains.comments.service import CommentService
 from app.domains.reaction.service import ReactionService
 from app.domains.reaction.schemas import ReactionResult, ReactionAction
+from app.domains.collaboration.schemas import CollabStatusResult, CollabStatusUpdate
+from app.domains.collaboration.service import CollaborationService
+
 from app.domains.post.service import PostService
 from app.domains.types.enum import PostType
 from app.domains.types.service import PostTypeService
@@ -219,6 +223,24 @@ async def comment_post(
         "comment_id": post_interaction.get("comment_id"),
     }
 
+
+@router.post("/{post_id}/send_collab_request", response_model=CollabStatusResult)
+async def send_collab_request(
+    post_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    collab_svc = CollaborationService(db)
+    return await collab_svc.send_request(post_id, current_user.id)
+
+@router.post("/{post_id}/revoke_collab_request", response_model=CollabStatusResult)
+async def revoke_collab_request(
+    post_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    collab_svc = CollaborationService(db)
+    return await collab_svc.revoke_request(post_id, current_user.id)
 
 @router.post("/{post_id}/like", response_model=ReactionResult)
 async def like_post(

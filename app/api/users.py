@@ -88,3 +88,21 @@ async def get_post_items(
         "items": pool_members,
         "next_cursor": next_cursor,
     }
+
+@router.put("/me/profile", response_model=UserSchema)
+async def update_my_profile(
+    profile_data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    service = UserService(db)
+    await service.update_profile(current_user.id, profile_data)
+    
+    # We should return the updated profile.
+    profile = await service.get_profile(current_user.id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found",
+        )
+    return profile

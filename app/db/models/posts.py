@@ -95,7 +95,7 @@ class CollaborationRequest(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    status = Column(Enum(CollaborationRequestStatus, name="collaboration_request_status"), nullable=False, server_default=CollaborationRequestStatus.requested.value, default=CollaborationRequestStatus.requested)
+    status = Column(Enum(CollaborationRequestStatus, name="status"), nullable=False, server_default=CollaborationRequestStatus.requested.value, default=CollaborationRequestStatus.requested)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     user_note = Column(Text, nullable=True)

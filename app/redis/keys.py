@@ -8,6 +8,9 @@ class RedisKeys:
     def user_liked_posts(user_id: str) -> str:
         return f"user:{user_id}:liked_posts"
 
+    @staticmethod
+    def user_collab_status(user_id: str) -> str:
+        return f"user:{user_id}:collab_status"
 
     @staticmethod
     def post_comments(post_id: str) -> str:

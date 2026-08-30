@@ -2,7 +2,7 @@ from typing import Any
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field,AliasChoices
-from app.db.models import PostType, PostStatus, ModerationStatus, ActionStatus, MediaType
+from app.db.models import PostType, PostStatus, ModerationStatus, ActionStatus, MediaType,CollaborationRequestStatus
 from app.domains.pool.schemas import PoolMember, PoolObject
 from app.domains.user.schemas import Author
 from app.schemas.common import Category, College
@@ -78,6 +78,7 @@ class Post(PostBase):
     created_at: datetime
     author: Author | None = None
     category: Category | None = None
+    collab_status: CollaborationRequestStatus | None = None
     college: College | None = None
     media: list[PostMedia] = Field(default_factory=list)
     is_liked: bool | None = None

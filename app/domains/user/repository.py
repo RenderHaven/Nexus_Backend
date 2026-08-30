@@ -64,6 +64,16 @@ class UserRepository:
         )
         return list(result.scalars().all())
 
+
+    async def update_profile_json(self, user_id: UUID, profile: dict) -> None:
+        from sqlalchemy import update
+        await self.db.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(profile=profile)
+        )
+        await self.db.commit()
+
     async def get_posts_ids(self,user_id:UUID,limit:int)->list[Post]:
         result=await self.db.execute(
             select(Post)
