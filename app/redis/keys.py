@@ -55,3 +55,7 @@ class RedisKeys:
     @staticmethod
     def comment_replies(comment_id: str) -> str:
         return f"comments:replies:{comment_id}"
+
+    @staticmethod
+    def chat_room(room_id: str) -> str:
+        return f"chat:room:{room_id}"

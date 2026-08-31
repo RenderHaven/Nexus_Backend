@@ -30,6 +30,9 @@ class ChatService:
         if not room:
             raise HTTPException(status_code=404, detail="Chat room not found")
 
+        if room.admin_id==user_id:
+            return room
+        
         participant = await self.repository.get_participant(
             chat_room_id=chat_room_id,
             user_id=user_id,
