@@ -54,34 +54,8 @@ async def get_chat_message_pool(
     }
 
 
-@router.get(
-    "/{chat_room_id}/messages",
-    response_model=Paginated[Message],
-)
-async def get_chat_messages(
-    chat_room_id: UUID,
-    cursor: str | None = None,
-    limit: int = 20,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    chat_svc = ChatService(db)
-
-    messages, next_cursor = await chat_svc.get_messages_from_db(
-        chat_room_id=chat_room_id,
-        user_id=current_user.id,
-        cursor=cursor,
-        limit=limit,
-    )
-
-    return {
-        "items": messages,
-        "next_cursor": next_cursor,
-    }
-
-
 @router.post(
-    "/{chat_room_id}/messages",
+    "/{chat_room_id}/message",
     response_model=Message,
     status_code=201,
 )

@@ -62,8 +62,13 @@ class PostService:
     async def update_comment_count(self, post_id: UUID, change: int):
         return await self.post_store.update_comment_count(post_id, change)
 
-    async def add_post(self, post):
-        return await self.post_store.add_post(post)
+    async def add_post(self, post:Post):
+        added_post_id = await self.post_store.add_post(post)
+        if post.type == "collaboration" and added_post_id:
+            from app.domains.chats.service import ChatService
+            chat_service = ChatService(self.db)
+            await chat_service.create_chat_room(added_post_id, post.user_id,name=post.title)
+        return added_post_id
 
     async def update_post(self, post):
         return await self.post_store.update(post)

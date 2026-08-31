@@ -82,3 +82,7 @@ class ChatService:
         )
 
         return Message.model_validate(message)
+
+    async def create_chat_room(self, post_id: UUID, user_id: UUID,name:str) -> ChatRoomSummary:
+        room = await self.repository.create_room(post_id=post_id, admin_id=user_id,name=name)
+        return ChatRoomSummary.model_validate(room)

@@ -94,3 +94,13 @@ class ChatRepository:
         await self.db.commit()
         await self.db.refresh(message)
         return message
+
+    async def create_room(self, post_id: UUID, admin_id: UUID,name:str) -> ChatRoom:
+        room_id = uuid4()
+        room = ChatRoom(id=room_id, post_id=post_id, admin_id=admin_id,name=name)
+        participant = ChatParticipant(id=uuid4(), chat_room_id=room_id, user_id=admin_id)
+        self.db.add(room)
+        self.db.add(participant)
+        await self.db.commit()
+        await self.db.refresh(room)
+        return room
