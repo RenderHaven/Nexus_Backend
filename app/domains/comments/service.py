@@ -80,6 +80,12 @@ class CommentService:
 
     async def comment(self, post_id: UUID, user_id: UUID, comment: str) -> dict:
         import uuid
+
+        from app.domains.post.service import PostService
+
+        post_svc = PostService(self.db)
+        await post_svc.require_post(post_id)
+
         comment_id = uuid.uuid4()
         
         created_comment = await self.comment_store.add_comment(
@@ -134,17 +140,21 @@ class CommentService:
         }
 
     async def delete(self, user_id: UUID, comment_id: UUID) -> dict:
-        success, post_id = await self.comment_store.delete_comment(user_id, comment_id)
-        
-        if success and post_id:
+        success, post_id, removed = await self.comment_store.delete_comment(
+            user_id, comment_id
+        )
+
+        # A comment takes its replies with it, so the post loses all of them.
+        if success and post_id and removed:
             from app.domains.post.service import PostService
             post_svc = PostService(self.db)
-            await post_svc.post_store.update_comment_count(post_id, -1)
+            await post_svc.post_store.update_comment_count(post_id, -removed)
 
         return {
             "status": "success" if success else "failed",
             "action": "comment_deleted",
-            "comment_id": str(comment_id)
+            "comment_id": str(comment_id),
+            "removed_count": removed,
         }
 
     async def process_batch(self, batch_messages):
@@ -178,9 +188,11 @@ class CommentService:
                     await self.comment_store.edit_comment(user_id, comment_id, comment)
                 elif action == "comment_deleted":
                     comment_id = UUID(data.get("comment_id"))
-                    success, post_id = await self.comment_store.delete_comment(user_id, comment_id)
+                    success, post_id, removed = await self.comment_store.delete_comment(
+                        user_id, comment_id
+                    )
                     if success and post_id:
-                        net_comments[str(post_id)] -= 1
+                        net_comments[str(post_id)] -= removed
                 count += 1
         
         if net_comments:

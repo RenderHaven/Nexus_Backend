@@ -64,7 +64,7 @@ class PostStorage:
 
         return results
 
-    async def add_post(self, post) -> UUID:
+    async def add_post(self, post:Post) -> UUID:
         db_post = await self.post_repo.create(post)
         return db_post.id
 

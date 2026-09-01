@@ -1,5 +1,8 @@
 from datetime import date
+
 from pydantic import BaseModel, Field
+
+from app.config import settings
 
 class SocialLink(BaseModel):
     title: str
@@ -33,11 +36,26 @@ class JourneyMilestone(BaseModel):
     icon: str | None = None
 
 class UserProfile(BaseModel):
-    about: str | None = None
-    skills: list[str] | None = None
-    social_links: list[SocialLink] | None = None
+    """
+    A user's profile. Every field is optional, and a partial payload only
+    touches the fields it names — anything omitted is left as it was.
+    """
 
-    experience: list[Experience] | None = None
-    education: list[Education] | None = None
-    projects: list[Project] | None = None
-    journey: list[JourneyMilestone] | None = None
+    about: str | None = Field(default=None, max_length=settings.MAX_ABOUT_LENGTH)
+    skills: list[str] | None = Field(default=None, max_length=settings.MAX_SKILLS)
+    social_links: list[SocialLink] | None = Field(
+        default=None, max_length=settings.MAX_PROFILE_ITEMS
+    )
+
+    experience: list[Experience] | None = Field(
+        default=None, max_length=settings.MAX_PROFILE_ITEMS
+    )
+    education: list[Education] | None = Field(
+        default=None, max_length=settings.MAX_PROFILE_ITEMS
+    )
+    projects: list[Project] | None = Field(
+        default=None, max_length=settings.MAX_PROFILE_ITEMS
+    )
+    journey: list[JourneyMilestone] | None = Field(
+        default=None, max_length=settings.MAX_PROFILE_ITEMS
+    )

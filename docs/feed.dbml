@@ -83,6 +83,7 @@ Enum collaboration_request_status {
   requested
   accepted
   rejected
+  revoked
 }
 
 Enum conversation_status {
@@ -185,6 +186,7 @@ Table post_media {
   id uuid [primary key]
   post_id uuid [not null]
   url text [not null]
+  public_id text [note: "cloudinary id, null for externally hosted media"]
   media_type media_type [not null]
   position integer [default: 1]
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
@@ -198,15 +200,21 @@ Table post_media {
 Table collaboration_requests {
   id uuid [primary key]
   post_id uuid [not null]
-  user_id uuid [not null]
+  sender_id uuid [not null, note: "the user asking to join"]
+  recipient_id uuid [not null, note: "the post author, who decides"]
   status collaboration_request_status [default: `requested`]
   created_at timestamp [default: `CURRENT_TIMESTAMP`]
   reviewed_at timestamp 
-  user_note text 
-  admin_note text
+  user_note text [note: "note written by the sender"]
+  admin_note text [note: "note written by the recipient when deciding"]
 
+  indexes {
+    (post_id, sender_id) [unique]
+    (sender_id, created_at)
+    (recipient_id, created_at)
+  }
 
-  Note: "An accepted response is what opens a conversation (see chat_participants.collaboration_request_id)."
+  Note: "Holding both sides lets 'requests I sent' and 'requests I received' be single indexed lookups. An accepted request is what opens a conversation (see chat_participants)."
 }
 
 // =========================
@@ -421,7 +429,8 @@ Ref: posts.restricted_to_college_id > colleges.id
 Ref: post_media.post_id > posts.id
 
 Ref: collaboration_requests.post_id > posts.id
-Ref: collaboration_requests.user_id > users.id
+Ref: collaboration_requests.sender_id > users.id
+Ref: collaboration_requests.recipient_id > users.id
 
 Ref: post_reactions.post_id > posts.id
 Ref: post_reactions.user_id > users.id

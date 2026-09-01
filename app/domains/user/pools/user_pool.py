@@ -8,20 +8,23 @@ class BaseUserPool(BasePool):
 
     async def get_objects(self) -> list[UserPoolObject]:
         """
-        Return posts that can be considered by this pool.
+        Return the users that can be considered by this pool.
         """
         return await self.get_users()
 
-    def to_member(self, post: UserPoolObject) -> UserPoolMember:
+    def to_member(self, user: UserPoolObject) -> UserPoolMember:
         """
-        Convert a PostPoolObject into the lightweight member
-        stored inside Redis.
+        Convert a UserPoolObject into the lightweight member stored inside
+        Redis. Every field the member declares is carried across, so a
+        listing never reports a stale default in place of the real value.
         """
         return UserPoolMember(
-            id=post.id,
-            college_id=post.college_id,
-            username=post.username,
-            created_at=post.created_at,
+            id=user.id,
+            college_id=user.college_id,
+            username=user.username,
+            role=user.role,
+            is_alumni=user.is_alumni,
+            created_at=user.created_at,
         )
 
     @classmethod
@@ -31,6 +34,6 @@ class BaseUserPool(BasePool):
     @abstractmethod
     async def get_users(self) -> list[UserPoolObject]:
         """
-        Return posts used to build this pool.
+        Return the users this pool is built from.
         """
         ...

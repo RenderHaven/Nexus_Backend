@@ -3,8 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import User, UserInterest, UserOpenTo, UserBadge
-from app.db.models import Post
+from app.db.models import College, Post, User, UserBadge, UserInterest, UserOpenTo
 
 
 class UserRepository:
@@ -43,6 +42,12 @@ class UserRepository:
         )
         return result.scalar_one_or_none()
 
+    async def college_exists(self, college_id: UUID) -> bool:
+        result = await self.db.execute(
+            select(College.id).where(College.id == college_id)
+        )
+        return result.scalar_one_or_none() is not None
+
     async def create(self, user: User) -> User:
         self.db.add(user)
         await self.db.commit()
@@ -78,6 +83,7 @@ class UserRepository:
         result=await self.db.execute(
             select(Post)
             .where(Post.user_id == user_id)
+            .where(Post.is_active.is_(True))
             .order_by(Post.created_at.desc())
             .limit(limit)
         )

@@ -1,5 +1,7 @@
 from datetime import datetime
 from uuid import UUID
+from fastapi import HTTPException
+
 from app.domains.comments.schemas import Comment
 from app.domains.comments.redis import CommentsRedis
 from app.domains.comments.repository import CommentRepository
@@ -67,24 +69,18 @@ class CommentStorage:
         offset: tuple[UUID, datetime] | None = None,
         limit: int = 20,
     ) -> list[UUID]:
-        if offset is None:
-            cached_ids = await self.redis_store.get_comments_ids(post_id)
-            if cached_ids is not None:
-                return [UUID(cid) for cid in cached_ids]
+        """
+        Root comment ids, newest first.
 
-        comment_ids = await self.repo.get_by_post_id(
+        Served straight from the database: the query is covered by
+        idx_comments_post_root_cursor, and caching the list keyed only by post
+        meant whichever caller asked first fixed the page size for everyone.
+        """
+        return await self.repo.get_by_post_id(
             post_id=post_id,
             offset=offset,
             limit=limit,
         )
-
-        if offset is None:
-            await self.redis_store.set_comments_ids(
-                post_id,
-                [str(cid) for cid in comment_ids],
-            )
-
-        return comment_ids
 
     async def get_reply_ids(
         self,
@@ -92,37 +88,23 @@ class CommentStorage:
         offset: tuple[UUID, datetime] | None = None,
         limit: int = 20,
     ) -> list[UUID]:
-        if offset is None:
-            cached_ids = await self.redis_store.get_replies_ids(comment_id)
-            if cached_ids is not None:
-                return [UUID(cid) for cid in cached_ids]
-
-        reply_ids = await self.repo.get_replies_by_parent_id(
+        """Reply ids for one comment, newest first. See get_comment_ids."""
+        return await self.repo.get_replies_by_parent_id(
             comment_id=comment_id,
             offset=offset,
             limit=limit,
         )
 
-        if offset is None:
-            await self.redis_store.set_replies_ids(
-                comment_id,
-                [str(rid) for rid in reply_ids],
-            )
-
-        return reply_ids
-
     async def add_comment(self, post_id: UUID, user_id: UUID, body: str, comment_id: UUID) -> Comment:
         db_comment = await self.repo.add_comment(post_id, user_id, body, comment_id)
         comment = Comment.model_validate(db_comment)
         await self.redis_store.set_comment(comment.model_dump(mode="json"))
-        await self.redis_store.prepend_comment_id(post_id, comment.id)
         return comment
 
     async def add_comment_reply(self, user_id: UUID, comment_id: UUID, body: str, reply_id: UUID) -> Comment:
         db_reply = await self.repo.add_comment_reply(user_id, comment_id, body, reply_id)
         reply = Comment.model_validate(db_reply)
         await self.redis_store.set_comment(reply.model_dump(mode="json"))
-        await self.redis_store.prepend_reply_id(comment_id, reply.id)
         parent_comment = await self.get_comment(comment_id)
         if parent_comment:
             parent_comment.reply_count += 1
@@ -135,19 +117,48 @@ class CommentStorage:
         await self.redis_store.set_comment(comment.model_dump(mode="json"))
         return comment
 
-    async def delete_comment(self, user_id: UUID, comment_id: UUID) -> tuple[bool, UUID | None]:
-        comment = await self.get_comment(comment_id)
-        if not comment or comment.user_id != user_id:
-            return False, None
+    async def delete_comment(
+        self,
+        user_id: UUID,
+        comment_id: UUID,
+    ) -> tuple[bool, UUID | None, int]:
+        """
+        Delete a comment the user owns, along with its replies.
 
-        success = await self.repo.delete(comment_id)
-        if success:
-            await self.redis_store.delete_comment(comment_id)
-            await self.redis_store.remove_comment_id(comment.post_id, comment_id)
-            if comment.parent_id:
-                await self.redis_store.remove_reply_id(comment.parent_id, comment_id)
-                parent_comment = await self.get_comment(comment.parent_id)
-                if parent_comment:
-                    parent_comment.reply_count = max(0, parent_comment.reply_count - 1)
-                    await self.redis_store.set_comment(parent_comment.model_dump(mode="json"))
-        return success, comment.post_id
+        Returns whether it happened, the post it belonged to, and how many
+        comments in total were removed.
+        """
+        comment = await self.get_comment(comment_id)
+
+        if not comment:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "comment_not_found", "message": "Comment not found"},
+            )
+
+        if comment.user_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "not_comment_author",
+                    "message": "Comment is not owned by the user",
+                },
+            )
+
+        success, removed_ids = await self.repo.delete(comment_id)
+
+        if not success:
+            return False, None, 0
+
+        for removed_id in removed_ids:
+            await self.redis_store.delete_comment(removed_id)
+
+        if comment.parent_id:
+            parent_comment = await self.get_comment(comment.parent_id)
+            if parent_comment:
+                parent_comment.reply_count = max(0, parent_comment.reply_count - 1)
+                await self.redis_store.set_comment(
+                    parent_comment.model_dump(mode="json")
+                )
+
+        return True, comment.post_id, len(removed_ids)

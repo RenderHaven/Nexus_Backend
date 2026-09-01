@@ -82,6 +82,9 @@ class PostMedia(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), nullable=False, index=True)
     url = Column(Text, nullable=False)
+    # Cloudinary id, needed to move or remove the file later. Nullable because
+    # media seeded from external URLs has none.
+    public_id = Column(Text, nullable=True)
     media_type = Column(Enum(MediaType, name="media_type"), nullable=False)
     position = Column(Integer, nullable=False, server_default="1", default=1)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -90,15 +93,33 @@ class PostMedia(Base):
 
 
 class CollaborationRequest(Base):
+    """
+    One person asking to join one collaboration post.
+
+    sender_id is who asked; recipient_id is the post's author, who decides.
+    Storing both means "requests I sent" and "requests I received" are each a
+    single indexed lookup, with no join back through posts.
+    """
+
     __tablename__ = "collaboration_requests"
+    __table_args__ = (
+        UniqueConstraint("post_id", "sender_id", name="uq_collab_requests_post_sender"),
+        Index("idx_collab_requests_sender", "sender_id", "created_at"),
+        Index("idx_collab_requests_recipient", "recipient_id", "created_at"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    sender_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    recipient_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
     status = Column(Enum(CollaborationRequestStatus, name="status"), nullable=False, server_default=CollaborationRequestStatus.requested.value, default=CollaborationRequestStatus.requested)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     user_note = Column(Text, nullable=True)
     admin_note = Column(Text, nullable=True)
+
     post = relationship("Post", back_populates="collaboration_requests")
-    user = relationship("User")
+    sender = relationship("User", foreign_keys=[sender_id])
+    recipient = relationship("User", foreign_keys=[recipient_id])

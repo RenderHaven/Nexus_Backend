@@ -1,10 +1,5 @@
-from enum import StrEnum
+# The post type enum lives with the models; re-exported here so the types
+# domain keeps its own import path without defining a second, divergent enum.
+from app.db.models.enums import PostType
 
-
-class PostType(StrEnum):
-    ACHIEVEMENT = "achievement"
-    KNOWLEDGE = "knowledge"
-    SPARK = "spark"
-    OPPORTUNITY = "opportunity"
-    EVENT = "event"
-    COLLABORATION = "collaboration"
+__all__ = ["PostType"]

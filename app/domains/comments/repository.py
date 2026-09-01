@@ -4,6 +4,8 @@ from uuid import UUID
 from sqlalchemy import select, update, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fastapi import HTTPException
+
 from app.db.models import PostComment, CommentEditLog, Post
 
 
@@ -71,11 +73,14 @@ class CommentRepository:
     ) -> PostComment:
         parent_comment = await self.get_by_id(comment_id)
 
-        if not parent_comment:
-            raise Exception("Parent comment not found")
-
-        if not parent_comment.is_active:
-            raise Exception("Parent comment is not active")
+        if not parent_comment or not parent_comment.is_active:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "code": "comment_not_found",
+                    "message": "The comment you replied to does not exist",
+                },
+            )
 
         post_id = parent_comment.post_id
 
@@ -87,8 +92,6 @@ class CommentRepository:
             parent_id=comment_id,
             is_active=True,
         )
-
-        self.db.add(reply_comment)
 
         self.db.add(reply_comment)
 
@@ -153,34 +156,57 @@ class CommentRepository:
     async def delete(
         self,
         comment_id: UUID,
-    ) -> bool:
+    ) -> tuple[bool, list[UUID]]:
+        """
+        Soft delete a comment and everything hanging off it.
+
+        Deleting a comment takes its replies with it — leaving them behind
+        would strand them under a comment nobody can see. Returns the ids of
+        every comment that was deactivated, so the post's comment count can be
+        adjusted by the right amount.
+        """
         post_comment = await self.get_by_id(comment_id)
 
         if not post_comment or not post_comment.is_active:
-            return False
+            return False, []
 
         post_comment.is_active = False
+        removed = [comment_id]
 
-        post_comment.is_active = False
+        # Walk down the reply chain; a reply may itself have replies.
+        frontier = [comment_id]
 
-        # If this is a reply, decrease parent's reply count
+        while frontier:
+            result = await self.db.execute(
+                select(PostComment).where(
+                    PostComment.parent_id.in_(frontier),
+                    PostComment.is_active.is_(True),
+                )
+            )
+            children = list(result.scalars().all())
+
+            if not children:
+                break
+
+            for child in children:
+                child.is_active = False
+                removed.append(child.id)
+
+            frontier = [child.id for child in children]
+
+        # If this was itself a reply, its parent has one fewer.
         if post_comment.parent_id is not None:
             await self.db.execute(
                 update(PostComment)
-                .where(
-                    PostComment.id == post_comment.parent_id
-                )
+                .where(PostComment.id == post_comment.parent_id)
                 .values(
-                    reply_count=func.greatest(
-                        0,
-                        PostComment.reply_count - 1,
-                    )
+                    reply_count=func.greatest(0, PostComment.reply_count - 1)
                 )
             )
 
         await self.db.commit()
 
-        return True
+        return True, removed
 
     # =========================
     # Fetch root comments

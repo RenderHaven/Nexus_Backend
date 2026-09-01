@@ -43,7 +43,16 @@ async def get_current_user(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalars().first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        # The token is well formed but its account no longer exists, so the
+        # client needs to sign in again rather than treat this as "not found".
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "unauthenticated",
+                "message": "Could not validate credentials",
+            },
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return user
 
 

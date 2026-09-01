@@ -95,6 +95,46 @@ class ChatRepository:
         await self.db.refresh(message)
         return message
 
+    async def get_room_by_post(self, post_id: UUID) -> ChatRoom | None:
+        result = await self.db.execute(
+            select(ChatRoom).where(ChatRoom.post_id == post_id)
+        )
+        return result.scalars().first()
+
+    async def add_participant(
+        self,
+        chat_room_id: UUID,
+        user_id: UUID,
+    ) -> ChatParticipant:
+        existing = await self.get_participant(chat_room_id, user_id)
+
+        if existing:
+            return existing
+
+        participant = ChatParticipant(
+            id=uuid4(),
+            chat_room_id=chat_room_id,
+            user_id=user_id,
+        )
+        self.db.add(participant)
+        await self.db.commit()
+        await self.db.refresh(participant)
+        return participant
+
+    async def remove_participant(
+        self,
+        chat_room_id: UUID,
+        user_id: UUID,
+    ) -> bool:
+        participant = await self.get_participant(chat_room_id, user_id)
+
+        if not participant:
+            return False
+
+        await self.db.delete(participant)
+        await self.db.commit()
+        return True
+
     async def create_room(self, post_id: UUID, admin_id: UUID,name:str) -> ChatRoom:
         room_id = uuid4()
         room = ChatRoom(id=room_id, post_id=post_id, admin_id=admin_id,name=name)

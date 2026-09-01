@@ -4,11 +4,13 @@ from app.domains.post.schemas import PostPoolObject
 
 class PostTypePool(BasePostPool):
 
-    def __init__(self, post_type: str, repository):
+    def __init__(self, post_type, repository):
         self.post_type = post_type
         self.repository = repository
 
-        self.pool_name = f"type:{post_type}"
+        # Use the enum value so the Redis key stays "type:event", not
+        # "type:PostType.event".
+        self.pool_name = f"type:{getattr(post_type, 'value', post_type)}"
 
     async def get_posts(self) -> list[PostPoolObject]:
         posts = await self.repository.get_posts_by_type(

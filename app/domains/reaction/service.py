@@ -14,6 +14,10 @@ class ReactionService:
         return await self.post_interaction_store.get_by_id(post_interaction_id)
         
     async def like(self, post_id: UUID, user_id: UUID):
+        from app.domains.post.service import PostService
+
+        await PostService(self.db).require_post(post_id)
+
         reaction = await self.post_interaction_store.update_like(post_id, user_id, True, commit=True)
         if reaction:
             await self.redis_store.update(str(post_id), str(user_id), like=True)
@@ -24,6 +28,10 @@ class ReactionService:
         return {"status": "success", "action": "like.created", "post_id": str(post_id), "user_id": str(user_id)}
 
     async def unlike(self, post_id: UUID, user_id: UUID):
+        from app.domains.post.service import PostService
+
+        await PostService(self.db).require_post(post_id)
+
         reaction = await self.post_interaction_store.update_like(post_id, user_id, False, commit=True)
         if reaction:
             await self.redis_store.update(str(post_id), str(user_id), like=False)

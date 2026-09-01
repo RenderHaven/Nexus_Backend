@@ -3,6 +3,9 @@ import json
 from app.redis.client import get_redis
 from app.redis.keys import RedisKeys
 
+# How long a cached post may be served before it is reloaded from the database.
+POST_CACHE_TTL = 8 * 60 * 60
+
 
 class PostStore:
 
@@ -16,19 +19,13 @@ class PostStore:
 
     async def set(
         self,
-        post: dict | str,
-        post_data: dict | None = None,
+        post_id: str,
+        post_data: dict,
     ) -> None:
-        if isinstance(post, dict):
-            pdict = post
-        else:
-            pdict = post_data or {}
-            if "id" not in pdict and post:
-                pdict["id"] = post
-
         await self.redis.set(
-            self._key(str(pdict["id"])),
-            json.dumps(pdict),
+            self._key(str(post_id)),
+            json.dumps(post_data),
+            ex=POST_CACHE_TTL,
         )
 
     async def get(
@@ -71,14 +68,17 @@ class PostStore:
         if not posts:
             return
             
-        # 1. Create a dictionary mapping of "Redis Key" -> "JSON String"
-        mapping = {
-            self._key(str(post["id"])): json.dumps(post)
-            for post in posts
-        }
-        
-        # 2. Set all keys at once using mset
-        await self.redis.mset(mapping)
+        # mset cannot carry a TTL, so pipeline the individual SETs instead.
+        pipeline = self.redis.pipeline()
+
+        for post in posts:
+            pipeline.set(
+                self._key(str(post["id"])),
+                json.dumps(post),
+                ex=POST_CACHE_TTL,
+            )
+
+        await pipeline.execute()
 
 
     async def delete(

@@ -4,6 +4,9 @@ from app.redis.client import get_redis
 from app.redis.keys import RedisKeys
 from .schemas import CollegeBasic
 
+# How long a cached college may be served before it is reloaded.
+COLLEGE_CACHE_TTL = 8 * 60 * 60
+
 class CollegeRedisStore:
     def __init__(self):
         self.redis = get_redis()
@@ -12,7 +15,14 @@ class CollegeRedisStore:
         return f"college:{str(college_id)}"
 
     async def set_college(self, college: CollegeBasic) -> None:
-        await self.redis.set(self._key(college.id), college.model_dump_json())
+        await self.redis.set(
+            self._key(college.id),
+            college.model_dump_json(),
+            ex=COLLEGE_CACHE_TTL,
+        )
+
+    async def delete_college(self, college_id: UUID | str) -> None:
+        await self.redis.delete(self._key(college_id))
 
     async def get_college(self, college_id: UUID) -> CollegeBasic | None:
         data = await self.redis.get(self._key(college_id))

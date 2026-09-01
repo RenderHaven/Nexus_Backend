@@ -86,6 +86,28 @@ class ChatService:
 
         return Message.model_validate(message)
 
+    async def add_participant(self, post_id: UUID, user_id: UUID) -> bool:
+        """
+        Put a user into the chat room of a collaboration post. Called when
+        the post author accepts their request.
+        """
+        room = await self.repository.get_room_by_post(post_id)
+
+        if not room:
+            return False
+
+        await self.repository.add_participant(room.id, user_id)
+        return True
+
+    async def remove_participant(self, post_id: UUID, user_id: UUID) -> bool:
+        """Take a user out of a collaboration post's chat room."""
+        room = await self.repository.get_room_by_post(post_id)
+
+        if not room or room.admin_id == user_id:
+            return False
+
+        return await self.repository.remove_participant(room.id, user_id)
+
     async def create_chat_room(self, post_id: UUID, user_id: UUID,name:str) -> ChatRoomSummary:
         room = await self.repository.create_room(post_id=post_id, admin_id=user_id,name=name)
         return ChatRoomSummary.model_validate(room)

@@ -9,7 +9,9 @@ class UserPostPool(BasePostPool):
     def __init__(self, user_id: UUID, repository):
         self.user_id = user_id
         self.repository = repository
-        self.idle_age=2*60*60
+        # Sliding window: a profile nobody visits stops being rebuilt.
+        self.refresh_time = -1
+        self.idle_age = 2 * 60 * 60
         self.pool_name = f"user:posts:{user_id}"
 
     async def get_posts(self) -> list[PostPoolObject]:

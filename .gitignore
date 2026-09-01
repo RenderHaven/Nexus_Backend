@@ -34,7 +34,9 @@ Thumbs.db
 # Logs
 # ==========================
 *.log
-logs/
+# Anchored to the project root: this is for runtime log output, not the
+# app/domains/logs package.
+/logs/
 
 # ==========================
 # Testing

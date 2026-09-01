@@ -14,4 +14,4 @@ class ZSetCursor(BaseModel):
 class PoolObject(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
-    title: str | None = Field(default=None, validation_alias=AliasChoices("name", "title"))
+    
