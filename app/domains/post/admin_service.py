@@ -126,7 +126,9 @@ class PostAdminService:
             sort=filters.sort.value,
             order=filters.order.value,
         )
-        return [Post.model_validate(p) for p in db_posts]
+        return await self.post_svc.hydrate_references(
+            [Post.model_validate(p) for p in db_posts]
+        )
 
     async def count_by_status(
         self,
@@ -290,7 +292,13 @@ class PostAdminService:
 
         entries = await self.logs.history_for_post(post_id)
 
-        return [ModerationLogEntry.model_validate(e) for e in entries]
+        from app.domains.user.hydrate import attach_users
+
+        return await attach_users(
+            self.db,
+            [ModerationLogEntry.model_validate(e) for e in entries],
+            ("moderator_id", "moderator"),
+        )
 
     # ------------------------------------------------------------------
     # Delete

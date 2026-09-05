@@ -3,6 +3,7 @@ from uuid import UUID
 from app.domains.post.repository import PostRepository
 from app.domains.post.redis import PostStore
 from app.domains.post.schemas import Post
+from app.redis import metrics
 
 
 class PostStorage:
@@ -15,7 +16,10 @@ class PostStorage:
         post = await self.redis_store.get(str(post_id))
 
         if post:
+            await metrics.record("post", hits=1)
             return Post.model_validate(post)
+
+        await metrics.record("post", misses=1)
 
         db_post = await self.post_repo.get_by_id(post_id)
 
@@ -45,6 +49,12 @@ class PostStorage:
                 post_map[pid] = item
             else:
                 missing_ids.append(pid)
+
+        await metrics.record(
+            "post",
+            hits=len(post_map),
+            misses=len(missing_ids),
+        )
 
         if missing_ids:
             db_posts = await self.post_repo.posts_by_ids(missing_ids)

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 from sqlalchemy import func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import noload, selectinload
 
 from app.db.models import Category, College, ModerationStatus, Post, PostStatus, User
 from app.domains.post.rules import apply_is_active
@@ -13,11 +13,23 @@ class PostRepository:
         self.db = db
 
     def _post_options(self):
+        """
+        What every post read loads: the post's own row plus its media, which
+        the post owns and which has no life outside it.
+
+        author, category and college are deliberately absent. They are
+        references, not parts of a post, and are resolved from their own
+        caches at read time -- see PostService._hydrate_references. Joining
+        them here is what made a renamed college keep serving its old name
+        out of every post that had embedded it. noload rather than plain
+        omission so validating the row cannot trip a lazy load on the async
+        session.
+        """
         return [
             selectinload(Post.media),
-            selectinload(Post.author),
-            selectinload(Post.category),
-            selectinload(Post.college),
+            noload(Post.author),
+            noload(Post.category),
+            noload(Post.college),
         ]
 
     # =========================
@@ -135,6 +147,7 @@ class PostRepository:
         return result.scalar_one_or_none()
 
     async def get_by_id(self, post_id: UUID) -> Post | None:
+        """One post as a flat row plus media. See _post_options."""
         result = await self.db.execute(
             select(Post)
             .options(*self._post_options())
@@ -169,6 +182,7 @@ class PostRepository:
         self,
         post_ids: list[UUID],
     ) -> list[Post]:
+        """Flat rows plus media, for the cache backfill. See _post_options."""
         if not post_ids:
             return []
         result = await self.db.execute(

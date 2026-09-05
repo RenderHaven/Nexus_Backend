@@ -251,10 +251,12 @@ class ModerationLogEntry(BaseModel):
     action: ModerationAction
     note: str | None = None
     created_at: datetime
-    moderator: UserBasic | None = Field(
-        default=None,
-        validation_alias=AliasChoices("moderator", "coach"),
+    # The row carries the id; the person is resolved from user:{id} at read
+    # time, the same way a post's author is.
+    moderator_id: UUID = Field(
+        validation_alias=AliasChoices("moderator_id", "coach_id"),
     )
+    moderator: UserBasic | None = None
 
 
 class ModerationQueueFilters(BaseModel):

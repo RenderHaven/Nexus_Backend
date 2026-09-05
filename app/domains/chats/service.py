@@ -8,6 +8,7 @@ from app.domains.chats.repository import ChatRepository
 from app.domains.chats.schemas import ChatRoomSummary, Message, MessagePoolMember
 from app.domains.cursor.service import CursorService
 from app.domains.pool.service import PoolService
+from app.domains.user.hydrate import attach_users
 
 
 class ChatService:
@@ -65,7 +66,14 @@ class ChatService:
             limit=limit,
         )
 
-        return [MessagePoolMember.model_validate(member) for member in members], next_cursor
+        messages = [MessagePoolMember.model_validate(member) for member in members]
+
+        return await self._hydrate_authors(messages), next_cursor
+
+    async def _hydrate_authors(self, messages: list) -> list:
+        """Attach each message's sender, resolved in one batch from
+        user:{id}. Nothing about a person is stored on the message."""
+        return await attach_users(self.db, messages, ("sender_id", "author"))
 
 
     async def send_message(

@@ -237,14 +237,14 @@ class StatsRepository:
 
         median_seconds = (await self.db.execute(median_q)).scalar_one_or_none()
 
+        # No join to users: the name is a reference, resolved from user:{id}
+        # by the service. Grouping on the id alone is also the cheaper group.
         by_mod_q = (
             select(
                 ModerationLog.coach_id,
-                User.username,
                 func.count(ModerationLog.id),
             )
-            .join(User, User.id == ModerationLog.coach_id)
-            .group_by(ModerationLog.coach_id, User.username)
+            .group_by(ModerationLog.coach_id)
             .order_by(func.count(ModerationLog.id).desc())
         )
 
@@ -256,8 +256,8 @@ class StatsRepository:
             ).where(Post.college_id == college_id)
 
         by_moderator = [
-            {"moderator_id": mid, "username": name, "decisions": n}
-            for mid, name, n in (await self.db.execute(by_mod_q)).all()
+            {"moderator_id": mid, "decisions": n}
+            for mid, n in (await self.db.execute(by_mod_q)).all()
         ]
 
         return {
@@ -422,12 +422,13 @@ class StatsRepository:
                 ModerationLog.post_id,
                 Post.college_id,
                 ModerationLog.coach_id,
-                User.username,
                 ModerationLog.note,
                 ModerationLog.created_at,
             )
+            # Joined to posts because the scope is the post's college; not
+            # joined to users, because the moderator's name is a reference the
+            # service resolves from user:{id}.
             .join(Post, Post.id == ModerationLog.post_id)
-            .join(User, User.id == ModerationLog.coach_id)
             .order_by(ModerationLog.created_at.desc(), ModerationLog.id.desc())
             .offset(offset)
             .limit(limit)
@@ -443,9 +444,8 @@ class StatsRepository:
                 "post_id": r[2],
                 "college_id": r[3],
                 "moderator_id": r[4],
-                "moderator_username": r[5],
-                "note": r[6],
-                "created_at": r[7],
+                "note": r[5],
+                "created_at": r[6],
             }
             for r in (await self.db.execute(q)).all()
         ]

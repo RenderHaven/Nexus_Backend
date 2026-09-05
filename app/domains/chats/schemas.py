@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models import ConversationStatus, MessageType
 from app.domains.pool.schemas import PoolMember, PoolObject
+from app.domains.user.schemas import UserMini
 
 
 class ChatRoomSummary(BaseModel):
@@ -37,6 +38,8 @@ class Message(BaseModel):
     body: str | None = None
     type: MessageType
     created_at: datetime
+    # Resolved from sender_id at read time against user:{id}.
+    author: UserMini | None = None
 
 
 class SendMessageRequest(BaseModel):
@@ -58,3 +61,4 @@ class MessagePoolMember(PoolMember):
     body: str | None = None
     type: MessageType
     created_at: datetime
+    author: UserMini | None = None

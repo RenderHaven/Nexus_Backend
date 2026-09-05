@@ -28,6 +28,11 @@ class UserService:
     async def get_author(self, user_id: UUID) -> UserMini | None:
         return await self.user_store.get_author(user_id)
 
+    async def get_authors(self, user_ids: list[UUID]) -> dict[UUID, UserBasic]:
+        """Batch id -> person, for hydrating a list of posts, comments or
+        messages. One MGET plus one IN query for whatever missed."""
+        return await self.user_store.get_authors(user_ids)
+
     async def get_user(self, user_id: UUID) -> UserBasic | None:
         return await self.user_store.get_user(user_id)
 

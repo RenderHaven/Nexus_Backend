@@ -36,6 +36,13 @@ class Permission(StrEnum):
     DELETE_USER = "delete_user"
     RESET_PASSWORD = "reset_password"
 
+    # Infrastructure
+    #
+    # Not college-scoped: Redis, OpenSearch and Postgres are one shared
+    # installation, so there is no per-campus view of them to scope to.
+    VIEW_INFRASTRUCTURE = "view_infrastructure"
+    MANAGE_INFRASTRUCTURE = "manage_infrastructure"
+
     # Colleges
     CREATE_COLLEGE = "create_college"
     EDIT_COLLEGE = "edit_college"
@@ -51,6 +58,8 @@ PERMISSIONS: dict[Permission, frozenset[UserRole]] = {
     Permission.MANAGE_USER: STAFF_ROLES,
     Permission.DELETE_USER: PLATFORM_ROLES,
     Permission.RESET_PASSWORD: PLATFORM_ROLES,
+    Permission.VIEW_INFRASTRUCTURE: PLATFORM_ROLES,
+    Permission.MANAGE_INFRASTRUCTURE: PLATFORM_ROLES,
     Permission.CREATE_COLLEGE: PLATFORM_ROLES,
     Permission.EDIT_COLLEGE: STAFF_ROLES,
     Permission.DELETE_COLLEGE: PLATFORM_ROLES,

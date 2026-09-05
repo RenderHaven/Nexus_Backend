@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import noload
 
 from app.db.models import ModerationAction, ModerationLog
 
@@ -11,6 +11,15 @@ from app.db.models import ModerationAction, ModerationLog
 class ModerationLogRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    def _options(self):
+        """
+        The log row only. The moderator who made the decision is a reference,
+        resolved from user:{id} by whoever renders the entry -- see
+        PostAdminService.history. noload so validating the row cannot trip a
+        lazy load on the async session.
+        """
+        return [noload(ModerationLog.coach)]
 
     async def add(
         self,
@@ -38,7 +47,7 @@ class ModerationLogRepository:
         """One post's decisions, newest first."""
         result = await self.db.execute(
             select(ModerationLog)
-            .options(selectinload(ModerationLog.coach))
+            .options(*self._options())
             .where(ModerationLog.post_id == post_id)
             .order_by(ModerationLog.created_at.desc(), ModerationLog.id.desc())
             .offset(offset)
@@ -59,7 +68,7 @@ class ModerationLogRepository:
         """
         query = (
             select(ModerationLog)
-            .options(selectinload(ModerationLog.coach))
+            .options(*self._options())
             .order_by(ModerationLog.created_at.desc(), ModerationLog.id.desc())
             .offset(offset)
             .limit(limit)

@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from app.domains.comments.schemas import Comment
 from app.domains.comments.redis import CommentsRedis
 from app.domains.comments.repository import CommentRepository
+from app.redis import metrics
 
 
 class CommentStorage:
@@ -15,7 +16,10 @@ class CommentStorage:
     async def get_comment(self, comment_id: UUID) -> Comment | None:
         cached = await self.redis_store.get_comment(comment_id)
         if cached:
+            await metrics.record("comment", hits=1)
             return Comment.model_validate(cached)
+
+        await metrics.record("comment", misses=1)
 
         db_comment = await self.repo.get_by_id(comment_id)
         if not db_comment or not db_comment.is_active:
@@ -40,6 +44,12 @@ class CommentStorage:
                 comment_map[cid] = item
             else:
                 missing_ids.append(cid)
+
+        await metrics.record(
+            "comment",
+            hits=len(comment_map),
+            misses=len(missing_ids),
+        )
 
         # If any comments were missing from Redis, fetch them from DB repository
         if missing_ids:

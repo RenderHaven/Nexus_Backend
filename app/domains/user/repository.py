@@ -1,27 +1,27 @@
 from uuid import UUID
 from sqlalchemy import func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-
-from app.db.models import College, Post, User, UserBadge, UserInterest, UserOpenTo
+from app.db.models import College, Post, User
 
 
 class UserRepository:
+    """
+    Reads of the `users` table and nothing else.
+
+    No relationship is eager loaded here. college, interests, open_to and
+    badges used to be pulled on every single user fetch -- including the one
+    behind every login -- and no schema in the codebase reads any of them:
+    UserMini, UserBasic, User and UserAdminRow are all scalar columns plus the
+    profile JSONB. Anything that does need a person's college resolves
+    college_id against college:{id}, the same way a post does.
+    """
+
     def __init__(self, db: AsyncSession):
         self.db = db
-
-    def _user_options(self):
-        return [
-            selectinload(User.college),
-            selectinload(User.interests).selectinload(UserInterest.category),
-            selectinload(User.open_to),
-            selectinload(User.badges).selectinload(UserBadge.badge),
-        ]
 
     async def get_by_id(self, user_id: UUID) -> User | None:
         result = await self.db.execute(
             select(User)
-            .options(*self._user_options())
             .where(User.id == user_id)
         )
         return result.scalar_one_or_none()
@@ -29,8 +29,10 @@ class UserRepository:
     # ------------------------------------------------------------------
     # Bulk / index reads
     #
-    # Columns only. _user_options() pulls college, interests and badges, which
-    # is four joins a caller that just wants a username has no use for.
+    # A narrower column list still, for callers walking the whole table. Note
+    # that nothing here may be written to user:{id}: a projection cached under
+    # that key would make the next UserBasic read validate successfully
+    # against an incomplete blob and quietly fill in defaults.
     # ------------------------------------------------------------------
 
     def _flat_select(self):
@@ -80,7 +82,6 @@ class UserRepository:
     async def get_by_email(self, email: str) -> User | None:
         result = await self.db.execute(
             select(User)
-            .options(*self._user_options())
             .where(User.email == email)
         )
         return result.scalar_one_or_none()
@@ -88,7 +89,6 @@ class UserRepository:
     async def get_by_username(self, username: str) -> User | None:
         result = await self.db.execute(
             select(User)
-            .options(*self._user_options())
             .where(User.username == username)
         )
         return result.scalar_one_or_none()
@@ -176,7 +176,6 @@ class UserRepository:
 
         result = await self.db.execute(
             select(User)
-            .options(*self._user_options())
             .where(*conditions)
             .order_by(direction(column), direction(User.id))
             .offset(offset)

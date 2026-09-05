@@ -10,6 +10,7 @@ from app.domains.collaboration.repository import CollaborationRepository
 from app.domains.collaboration.schemas import CollabRequest
 from app.domains.collaboration.storage import CollaborationStorage
 from app.domains.post.repository import PostRepository
+from app.domains.user.hydrate import attach_users
 
 # A request may only move between these states, and only in this direction.
 ALLOWED_TRANSITIONS: dict[CollaborationRequestStatus, set[CollaborationRequestStatus]] = {
@@ -263,7 +264,12 @@ class CollaborationService:
             limit=limit,
             offset=offset,
         )
-        return [CollabRequest.model_validate(r) for r in rows]
+        return await attach_users(
+            self.db,
+            [CollabRequest.model_validate(r) for r in rows],
+            ("sender_id", "sender"),
+            ("recipient_id", "recipient"),
+        )
 
     async def list_received_requests(
         self,
@@ -279,7 +285,12 @@ class CollaborationService:
             limit=limit,
             offset=offset,
         )
-        return [CollabRequest.model_validate(r) for r in rows]
+        return await attach_users(
+            self.db,
+            [CollabRequest.model_validate(r) for r in rows],
+            ("sender_id", "sender"),
+            ("recipient_id", "recipient"),
+        )
 
     # ------------------------------------------------------------------
     # Post author side
@@ -315,7 +326,12 @@ class CollaborationService:
             limit=limit,
             offset=offset,
         )
-        return [CollabRequest.model_validate(r) for r in rows]
+        return await attach_users(
+            self.db,
+            [CollabRequest.model_validate(r) for r in rows],
+            ("sender_id", "sender"),
+            ("recipient_id", "recipient"),
+        )
 
     async def review_request(
         self,

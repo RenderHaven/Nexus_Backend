@@ -3,6 +3,7 @@ from uuid import UUID
 from app.domains.comments.schemas import Comment
 from app.domains.comments.storage import CommentStorage
 from app.domains.cursor.service import CursorService
+from app.domains.user.hydrate import attach_users
 
 from app.config import settings
 
@@ -22,8 +23,24 @@ class CommentService:
         offset = cursor_data["offset"]
         return (UUID(offset["id"]), datetime.fromisoformat(offset["created_at"]))
 
+    async def _hydrate_authors(self, comments: list[Comment]) -> list[Comment]:
+        """
+        Attach each comment's author, resolved from user:{id}.
+
+        Deliberately after the store has returned and cached the flat rows,
+        so nothing that gets written to comment:{id} carries a copy of a
+        person's name.
+        """
+        return await attach_users(self.db, comments, ("user_id", "author"))
+
     async def get_comment(self, comment_id: UUID) -> Comment | None:
-        return await self.comment_store.get_comment(comment_id)
+        comment = await self.comment_store.get_comment(comment_id)
+
+        if not comment:
+            return None
+
+        await self._hydrate_authors([comment])
+        return comment
 
     async def get_comment_ids(
         self,
@@ -40,7 +57,7 @@ class CommentService:
         if not ids:
             return [], None
 
-        last_comment = await self.get_comment(ids[-1])
+        last_comment = await self.comment_store.get_comment(ids[-1])
         if not last_comment:
             return ids, None
 
@@ -51,7 +68,8 @@ class CommentService:
         return ids, next_cursor
 
     async def get_many_comments(self, comment_ids: list[UUID]) -> list[Comment]:
-        return await self.comment_store.get_many_comments(comment_ids)
+        comments = await self.comment_store.get_many_comments(comment_ids)
+        return await self._hydrate_authors(comments)
 
     async def get_reply_ids(
         self,
@@ -68,7 +86,7 @@ class CommentService:
         if not ids:
             return [], None
 
-        last_comment = await self.get_comment(ids[-1])
+        last_comment = await self.comment_store.get_comment(ids[-1])
         if not last_comment:
             return ids, None
 

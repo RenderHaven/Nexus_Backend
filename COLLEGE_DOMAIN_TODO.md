@@ -131,6 +131,12 @@ No migration expected.
       `college:users:{id}` and `college:posts:{id}`.
 - [x] Renaming a college does not touch the post/user documents that embed
       its name — confirm nothing caches the name outside `college:{id}`.
+      **Resolved.** `post:{id}` used to be written with the college joined
+      into it, so a rename kept serving the old name for the whole 8h post
+      TTL. The post cache now stores the post's own row only and the college
+      is hydrated per-read from `college:{id}`, which the edit already busts.
+      Same for the category and the author. Pinned by
+      `tests/verify_entity_hydration.py`.
 
 ## 8. Verify — DONE, all green against the live stack
 
@@ -169,5 +175,6 @@ No migration expected.
   `/{id}/post_items`; add a cursor here if the People tab needs to scroll.
 - `Page.total` is the page size here too, same as the other tables.
 
-Verified by `tests/verify_post_user_domains.py` (148 checks, 34 of them
-college) and `tests/verify_search_and_cache.py` (15 checks).
+Verified by `tests/verify_post_user_domains.py` (220 checks, 34 of them
+college), `tests/verify_search_and_cache.py` (15 checks) and
+`tests/verify_entity_hydration.py` (45 checks).

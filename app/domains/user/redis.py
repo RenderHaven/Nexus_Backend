@@ -28,6 +28,34 @@ class UserRedisStore:
             return None
         return json.loads(data)
 
+    async def get_many(self, user_ids: list[UUID | str]) -> list[dict | None]:
+        """One MGET over user:{id}. Positional -- a miss comes back as None."""
+        if not user_ids:
+            return []
+
+        data = await self.redis.mget([self._key(uid) for uid in user_ids])
+        return [json.loads(item) if item is not None else None for item in data]
+
+    async def set_many(self, users: list[dict]) -> None:
+        """
+        Backfill several users at once.
+
+        MSET cannot carry a TTL, so the individual SETs are pipelined instead.
+        """
+        if not users:
+            return
+
+        pipeline = self.redis.pipeline()
+
+        for user in users:
+            pipeline.set(
+                self._key(user["id"]),
+                json.dumps(user),
+                ex=USER_CACHE_TTL,
+            )
+
+        await pipeline.execute()
+
     async def delete(self, user_id: UUID | str) -> None:
         await self.redis.delete(self._key(user_id), self._profile_key(user_id))
 

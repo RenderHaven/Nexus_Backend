@@ -88,12 +88,14 @@ class StatsService:
     ) -> ModerationStats:
         college_id = self._scope(actor, college_id)
 
-        return ModerationStats(
+        stats = ModerationStats(
             **await self.repo.moderation_stats(
                 college_id=college_id,
                 since=range_start(range_key),
             )
         )
+
+        return await self._name_moderators(stats.by_moderator, stats)
 
     async def post_breakdown(
         self,
@@ -199,4 +201,34 @@ class StatsService:
             limit=limit,
             offset=offset,
         )
-        return [ActivityEntry(**r) for r in rows]
+        entries = [ActivityEntry(**r) for r in rows]
+
+        return await self._name_moderators(entries, entries)
+
+    async def _name_moderators(self, rows: list, result):
+        """
+        Fill in the moderator usernames these rows only carry ids for.
+
+        These are display strings rather than nested objects, so they cannot
+        go through attach_users, but the source is the same: one batched read
+        of user:{id}, no join to users in the query itself.
+        """
+        if not rows:
+            return result
+
+        from app.domains.user.service import UserService
+
+        users = await UserService(self.db).get_authors(
+            [r.moderator_id for r in rows if r.moderator_id]
+        )
+
+        for row in rows:
+            user = users.get(row.moderator_id)
+            if user is None:
+                continue
+            if hasattr(row, "moderator_username"):
+                row.moderator_username = user.username
+            else:
+                row.username = user.username
+
+        return result

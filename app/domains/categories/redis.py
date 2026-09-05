@@ -23,6 +23,28 @@ class CategoryRedisStore:
             return None
         return CategoryBasic.model_validate_json(data)
 
+    async def get_many(self, category_ids: list[UUID]) -> list[CategoryBasic | None]:
+        """One MGET over category:{id}. Positional -- a miss comes back as None."""
+        if not category_ids:
+            return []
+
+        data = await self.redis.mget([self._key(cid) for cid in category_ids])
+        return [
+            CategoryBasic.model_validate_json(item) if item is not None else None
+            for item in data
+        ]
+
+    async def set_many(self, categories: list[CategoryBasic]) -> None:
+        if not categories:
+            return
+
+        pipeline = self.redis.pipeline()
+
+        for category in categories:
+            pipeline.set(self._key(category.id), category.model_dump_json())
+
+        await pipeline.execute()
+
     async def set_all_categories(self, categories: list[CategoryBasic]) -> None:
         data = [c.model_dump(mode="json") for c in categories]
         await self.redis.set(self._all_key(), json.dumps(data))

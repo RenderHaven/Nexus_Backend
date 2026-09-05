@@ -10,5 +10,12 @@ class CategoryService:
     async def get_category(self, category_id: UUID) -> CategoryBasic | None:
         return await self.storage.get_category(category_id)
 
+    async def get_categories_by_id(
+        self,
+        category_ids: list[UUID],
+    ) -> dict[UUID, CategoryBasic]:
+        """Batch id -> category, for hydrating a list of posts."""
+        return await self.storage.get_categories_by_id(category_ids)
+
     async def get_all_categories(self) -> list[CategoryBasic]:
         return await self.storage.get_all_categories()

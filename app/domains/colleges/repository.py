@@ -32,6 +32,23 @@ class CollegeRepository:
         )
         return [CollegeBasic.model_validate(c) for c in result.scalars().all()]
 
+    async def colleges_by_ids(self, college_ids: list[UUID]) -> list[CollegeBasic]:
+        """
+        Full rows for a set of ids, for hydrating a page of posts or users.
+
+        Full rows on purpose, not _flat_select(): whatever this returns is
+        written back to college:{id}, and a projection would leave a blob
+        that the next CollegeBasic read validates against silently, filling
+        in defaults for the columns it dropped.
+        """
+        if not college_ids:
+            return []
+
+        result = await self.db.execute(
+            select(College).where(College.id.in_(college_ids))
+        )
+        return [CollegeBasic.model_validate(c) for c in result.scalars().all()]
+
     # ------------------------------------------------------------------
     # Bulk / index reads
     # ------------------------------------------------------------------

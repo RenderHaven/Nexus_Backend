@@ -2,9 +2,9 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import noload
 
-from app.db.models import CollaborationRequest, User
+from app.db.models import CollaborationRequest
 from app.db.models.enums import CollaborationRequestStatus
 
 
@@ -13,9 +13,17 @@ class CollaborationRepository:
         self.db = db
 
     def _options(self):
+        """
+        The request's own row and nothing else.
+
+        sender and recipient are references: CollaborationService resolves
+        both from user:{id} in one batch after the rows come back. noload
+        rather than omission so validating a row into CollabRequest cannot
+        trip a lazy load on the async session.
+        """
         return [
-            selectinload(CollaborationRequest.sender).selectinload(User.college),
-            selectinload(CollaborationRequest.recipient).selectinload(User.college),
+            noload(CollaborationRequest.sender),
+            noload(CollaborationRequest.recipient),
         ]
 
     # ------------------------------------------------------------------

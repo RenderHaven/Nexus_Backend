@@ -13,6 +13,7 @@ from app.api.collabs import router as collabs_router
 from app.api.home import router as home_router
 from app.api.search import router as search_router
 from app.api.admin import router as admin_router
+from app.api.infra import router as infra_router
 api_router = APIRouter()
 
 api_router.include_router(
@@ -91,4 +92,10 @@ api_router.include_router(
     chats_router,
     prefix="/chats",
     tags=["Chats"],
+)
+
+api_router.include_router(
+    infra_router,
+    prefix="/infra",
+    tags=["Infrastructure"],
 )

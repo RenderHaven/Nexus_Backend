@@ -52,6 +52,40 @@ class PostService:
 
         return posts
 
+    async def hydrate_references(self, posts: list[Post]) -> list[Post]:
+        """
+        Resolve the ids a post carries against each entity's own cache.
+
+        Nothing here comes off post:{id}: the post row holds user_id,
+        category_id and college_id, and each of those is looked up in a batch
+        against user:{id} / category:{id} / college:{id}. That is what makes
+        a rename correct on the next read -- one key to bust, rather than
+        every cached post that happened to embed the old name.
+        """
+        if not posts:
+            return posts
+
+        from app.domains.categories.service import CategoryService
+        from app.domains.colleges.service import CollegeService
+        from app.domains.user.hydrate import attach_users
+
+        await attach_users(self.db, posts, ("user_id", "author"))
+
+        categories = await CategoryService(self.db).get_categories_by_id(
+            [p.category_id for p in posts if p.category_id]
+        )
+        colleges = await CollegeService(self.db).get_colleges_by_id(
+            [p.college_id for p in posts if p.college_id]
+        )
+
+        for post in posts:
+            post.category = categories.get(post.category_id)
+            post.college = (
+                colleges.get(post.college_id) if post.college_id else None
+            )
+
+        return posts
+
     @staticmethod
     def _is_visible_to(post: Post, actor: Actor) -> bool:
         """
@@ -79,6 +113,8 @@ class PostService:
         if not post or not self._is_visible_to(post, actor):
             return None
 
+        await self.hydrate_references([post])
+
         return await self._get_user_interactions(actor, post)
 
     async def get_posts(self, post_ids: list[UUID], actor: Actor | None = None):
@@ -93,6 +129,8 @@ class PostService:
 
         if not posts:
             return []
+
+        await self.hydrate_references(posts)
 
         return await self._get_user_interactions(actor, posts)
 
@@ -216,7 +254,9 @@ class PostService:
             offset=offset,
             is_active=False,
         )
-        return [Post.model_validate(p) for p in db_posts]
+        return await self.hydrate_references(
+            [Post.model_validate(p) for p in db_posts]
+        )
 
     async def _set_owner_status(
         self,

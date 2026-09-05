@@ -20,6 +20,13 @@ class CollegeService:
     async def get_college(self, college_id: UUID) -> CollegeBasic | None:
         return await self.storage.get_college(college_id)
 
+    async def get_colleges_by_id(
+        self,
+        college_ids: list[UUID],
+    ) -> dict[UUID, CollegeBasic]:
+        """Batch id -> college, for hydrating a list of posts or users."""
+        return await self.storage.get_colleges_by_id(college_ids)
+
     async def get_colleges(self) -> list[CollegeBasic]:
         """
         Every college, straight from the database.
