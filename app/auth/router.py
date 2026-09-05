@@ -29,7 +29,20 @@ async def login_access_token(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect email or password"
         )
-    
+
+    # Checked only after the password, so this endpoint cannot be used to
+    # find out which accounts exist. A distinct code, because "your account
+    # was deactivated" is not the same problem as a wrong password and the
+    # client needs to say so.
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "account_deactivated",
+                "message": "This account has been deactivated. Contact your college staff.",
+            },
+        )
+
     return {
         "access_token": create_access_token(subject=user.id),
         "token_type": "bearer",

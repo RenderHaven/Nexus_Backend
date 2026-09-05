@@ -10,7 +10,7 @@ from app.domains.user.profile_schemas import UserProfile
 from app.domains.user.repository import UserRepository
 from app.domains.user.schemas import User, UserBasic, UserCreate, UserMini
 from app.domains.user.storage import UserStorage
-from app.rules import Permission, require_assignable_role, require_college_permission
+from app.rules import Actor, Permission
 
 
 class UserService:
@@ -65,17 +65,21 @@ class UserService:
 
     async def update_profile(
         self,
-        user_id: UUID,
+        actor,
         profile: UserProfile,
         replace: bool = False,
     ) -> UUID:
         """
-        Merge the given fields into the user's profile.
+        Merge the given fields into the caller's own profile.
 
-        Only the fields actually present in the payload are touched, so a
-        client sending just `about` keeps its skills, education and the rest.
-        Pass replace=True to overwrite the whole profile instead.
+        The subject is taken from the actor rather than a parameter, so there
+        is no id for a caller to swap for someone else's. Only the fields
+        actually present in the payload are touched, so a client sending just
+        `about` keeps its skills, education and the rest. Pass replace=True to
+        overwrite the whole profile instead.
         """
+        user_id = actor.id
+
         db_user = await self.user_repo.get_by_id(user_id)
 
         if not db_user:
@@ -106,12 +110,8 @@ class UserService:
         college, while a moderator or success coach may only add one to their
         own. Which roles the actor may hand out is decided by app/rules.
         """
-        require_college_permission(
-            actor,
-            Permission.CREATE_USER,
-            payload.college_id,
-        )
-        require_assignable_role(actor, payload.role)
+        actor.require(Permission.CREATE_USER, payload.college_id)
+        actor.require_assignable_role(payload.role)
 
         if not await self.user_repo.college_exists(payload.college_id):
             raise HTTPException(
@@ -142,4 +142,8 @@ class UserService:
         )
 
         created = await self.user_repo.create(db_user)
+
+        from app.domains.search.service import SearchService
+        await SearchService(self.db).update_user_search(created.id)
+
         return created.id

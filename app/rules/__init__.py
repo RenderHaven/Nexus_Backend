@@ -1,3 +1,4 @@
+from .actor import Actor
 from .content import RESTRICTED_POST_TYPES
 from .permissions import (
     ASSIGNABLE_ROLES,
@@ -22,6 +23,7 @@ from .roles import (
 )
 
 __all__ = [
+    "Actor",
     "RESTRICTED_POST_TYPES",
     "Permission",
     "PERMISSIONS",

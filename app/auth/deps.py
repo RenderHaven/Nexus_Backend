@@ -53,6 +53,18 @@ async def get_current_user(
             },
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Checked on every request, not only at login: a token issued before the
+    # account was deactivated would otherwise keep working until it expired.
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "account_deactivated",
+                "message": "This account has been deactivated. Contact your college staff.",
+            },
+        )
+
     return user
 
 
@@ -68,7 +80,14 @@ async def get_current_user_optional(
             return None
         user_id = UUID(user_id_str)
         result = await db.execute(select(User).where(User.id == user_id))
-        return result.scalars().first()
+        user = result.scalars().first()
+
+        # A deactivated account reads the app as a signed-out visitor rather
+        # than being refused, so public pages keep working.
+        if user is not None and not user.is_active:
+            return None
+
+        return user
     except Exception:
         return None
 
@@ -120,3 +139,26 @@ async def get_current_active_user(
 ) -> User:
     return current_user
 
+
+
+async def get_actor(
+    current_user: User = Depends(get_current_user),
+) -> "Actor":
+    """The signed-in caller, wrapped so services can ask what they may do."""
+    from app.rules import Actor
+
+    return Actor(user=current_user)
+
+
+async def get_actor_optional(
+    current_user: User | None = Depends(get_current_user_optional),
+) -> "Actor":
+    """
+    The caller when there is one, an anonymous Actor when there is not.
+
+    Public reads take this so they can narrow by role without every endpoint
+    re-deriving "is anyone signed in".
+    """
+    from app.rules import Actor
+
+    return Actor(user=current_user)

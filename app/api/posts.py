@@ -7,7 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.config import settings
-from app.auth.deps import get_current_user_id_optional
+from app.auth.deps import (
+    get_actor,
+    get_actor_optional,
+    get_current_user_id_optional,
+)
 from app.db.models import ModerationStatus, PostType, User
 from app.db.models import Post as DBPost, PostMedia as DBPostMedia
 from app.db.session import get_db
@@ -16,9 +20,13 @@ from app.domains.comments.service import CommentService
 from app.domains.post.admin_service import (
     RESTRICTED_POST_TYPES,
     PostAdminService,
-    require_moderator,
 )
 from app.domains.post.schemas import (
+    BulkModerationResult,
+    BulkModerationUpdate,
+    ModerationCounts,
+    ModerationLogEntry,
+    ModerationQueueFilters,
     ModerationUpdate,
     Post,
     PostCreate,
@@ -29,7 +37,8 @@ from app.domains.post.service import PostService
 from app.domains.reaction.schemas import ReactionAction, ReactionResult
 from app.domains.reaction.service import ReactionService
 from app.domains.types.service import PostTypeService
-from app.schemas.common import Paginated
+from app.rules import Actor, Permission
+from app.schemas.common import Page, Paginated
 from app.schemas.response import ApiResponse, success
 
 router = APIRouter()
@@ -43,11 +52,18 @@ class PostIDsRequest(BaseModel):
     post_ids: list[UUID] = Field(..., min_length=1, max_length=settings.MAX_BATCH_SIZE)
 
 
-async def get_moderator_user(
-    current_user: User = Depends(get_current_user),
-) -> User:
-    """Only admins, moderators and success coaches may moderate."""
-    return require_moderator(current_user)
+async def get_moderator_actor(
+    actor: Actor = Depends(get_actor),
+) -> Actor:
+    """
+    Only admins, moderators and success coaches may moderate.
+
+    This is the role gate alone. Which college the caller may act on is
+    decided per request by the service, from the college of the post or of
+    the queue being read.
+    """
+    actor.require(Permission.MODERATE_POST)
+    return actor
 
 
 def create_db_post_from_schema(payload: PostCreate, current_user: User) -> DBPost:
@@ -96,7 +112,7 @@ async def _create_post(
     payload: PostCreate,
     bg_tasks: BackgroundTasks,
     current_user: User,
-    service: PostService | PostAdminService,
+    service,
 ) -> dict:
     """
     Shared create path. The post is always stored as pending / not active;
@@ -133,12 +149,12 @@ async def add_post(
     Event and opportunity posts may only be created by staff."""
     # Events and opportunities are moderator-only, whichever route creates them.
     if payload.type in RESTRICTED_POST_TYPES:
-        require_moderator(current_user)
-        service: PostService | PostAdminService = PostAdminService(db)
-    else:
-        service = PostService(db)
+        Actor(user=current_user).require(Permission.CREATE_RESTRICTED_POST)
+        return await _create_post(
+            payload, bg_tasks, current_user, PostAdminService(db)
+        )
 
-    return await _create_post(payload, bg_tasks, current_user, service)
+    return await _create_post(payload, bg_tasks, current_user, PostService(db))
 
 
 @router.post("/collaborations", response_model=ApiResponse[PostIdPayload], status_code=201)
@@ -160,7 +176,7 @@ async def add_collaboration(
 async def add_event(
     payload: PostCreate,
     bg_tasks: BackgroundTasks,
-    current_user: User = Depends(get_moderator_user),
+    moderator: Actor = Depends(get_moderator_actor),
     db: AsyncSession = Depends(get_db),
 ):
     """Create an event post. Staff only.
@@ -169,14 +185,16 @@ async def add_event(
     admins, moderators and success coaches, and are published under the
     college of the staff member creating them."""
     payload.type = PostType.event
-    return await _create_post(payload, bg_tasks, current_user, PostAdminService(db))
+    return await _create_post(
+        payload, bg_tasks, moderator.user, PostAdminService(db)
+    )
 
 
 @router.post("/opportunities", response_model=ApiResponse[PostIdPayload], status_code=201)
 async def add_opportunity(
     payload: PostCreate,
     bg_tasks: BackgroundTasks,
-    current_user: User = Depends(get_moderator_user),
+    moderator: Actor = Depends(get_moderator_actor),
     db: AsyncSession = Depends(get_db),
 ):
     """Create an opportunity post. Staff only.
@@ -185,7 +203,9 @@ async def add_opportunity(
     admins, moderators and success coaches, and are published under the
     college of the staff member creating them."""
     payload.type = PostType.opportunity
-    return await _create_post(payload, bg_tasks, current_user, PostAdminService(db))
+    return await _create_post(
+        payload, bg_tasks, moderator.user, PostAdminService(db)
+    )
 
 
 # ----------------------------------------------------------------------
@@ -195,7 +215,7 @@ async def add_opportunity(
 @router.post("/batch", response_model=list[Post])
 async def get_posts(
     payload: PostIDsRequest,
-    user_id: UUID | None = Depends(get_current_user_id_optional),
+    actor: Actor = Depends(get_actor_optional),
     db: AsyncSession = Depends(get_db),
 ):
     """Fetch several posts at once by id.
@@ -203,17 +223,14 @@ async def get_posts(
     Feeds and listings return ids first, then load the posts they need in one
     call. Posts that are not public are skipped unless you are the author."""
     post_svc = PostService(db)
-    return await post_svc.get_posts(
-        payload.post_ids,
-        user_id,
-    )
+    return await post_svc.get_posts(payload.post_ids, actor)
 
 
 @router.get("/my_inactive_posts", response_model=list[Post])
 async def get_my_inactive_posts(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    current_user: User = Depends(get_current_user),
+    actor: Actor = Depends(get_actor),
     db: AsyncSession = Depends(get_db),
 ):
     """List your posts that are not public yet.
@@ -223,7 +240,7 @@ async def get_my_inactive_posts(
     on your profile instead."""
     post_svc = PostService(db)
     return await post_svc.list_my_inactive_posts(
-        user_id=current_user.id,
+        actor=actor,
         limit=limit,
         offset=offset,
     )
@@ -263,45 +280,113 @@ async def get_type_post_items(
 # Moderation
 # ----------------------------------------------------------------------
 
-@router.get("/moderation/{moderation_status}", response_model=list[Post])
+@router.get("/moderation/counts", response_model=ModerationCounts)
+async def get_moderation_counts(
+    college_id: UUID | None = None,
+    moderator: Actor = Depends(get_moderator_actor),
+    db: AsyncSession = Depends(get_db),
+):
+    """How many posts sit in each moderation state. Staff only.
+
+    One call for every tab badge on the review screen. Scoped to your own
+    college unless you are an admin, in which case college_id narrows it."""
+    admin_svc = PostAdminService(db)
+    return await admin_svc.count_by_status(moderator, college_id)
+
+
+@router.patch("/moderation/bulk", response_model=BulkModerationResult)
+async def bulk_update_moderation(
+    payload: BulkModerationUpdate,
+    moderator: Actor = Depends(get_moderator_actor),
+    db: AsyncSession = Depends(get_db),
+):
+    """Approve, hold or remove a selection of posts at once. Staff only.
+
+    One bad id does not sink the batch: the response lists what went through
+    and what did not, with a reason for each failure."""
+    admin_svc = PostAdminService(db)
+    return await admin_svc.bulk_update_moderation(
+        actor=moderator,
+        post_ids=payload.post_ids,
+        moderation_status=payload.moderation_status,
+        note=payload.note,
+    )
+
+
+@router.get("/moderation/{moderation_status}", response_model=Page[Post])
 async def list_posts_by_moderation_status(
     moderation_status: ModerationStatus,
+    # Depends() rather than Annotated[..., Query()]: with another query
+    # parameter alongside it, the Annotated form documents the model as a
+    # single opaque `filters` parameter instead of flattening it, which would
+    # put the wrong thing in the API contract.
+    filters: ModerationQueueFilters = Depends(),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    college_id: UUID | None = None,
-    _moderator: User = Depends(get_moderator_user),
+    moderator: Actor = Depends(get_moderator_actor),
     db: AsyncSession = Depends(get_db),
 ):
     """Review queue for one moderation state. Staff only.
 
     Use it to work through posts awaiting a decision, or to look back at what
     was approved, held or removed. Posts their author has archived or deleted
-    are left out, and results can be narrowed to a single college."""
+    are left out.
+
+    Narrow the queue by author, category, type, free text or a date range,
+    and sort by when a post arrived, when it was reviewed, or how it is
+    performing. A moderator is scoped to their own college: leave college_id
+    out and it is filled in for you, and asking for another college is
+    refused. An admin may ask for any, or omit it for all of them at once."""
     admin_svc = PostAdminService(db)
-    return await admin_svc.list_by_moderation_status(
+
+    items = await admin_svc.list_moderation_queue(
+        actor=moderator,
         moderation_status=moderation_status,
+        filters=filters,
         limit=limit,
         offset=offset,
-        college_id=college_id,
     )
+
+    return Page.of(items, limit=limit, offset=offset)
+
+
+@router.get(
+    "/{post_id}/moderation_history",
+    response_model=list[ModerationLogEntry],
+)
+async def get_moderation_history(
+    post_id: UUID,
+    actor: Actor = Depends(get_actor),
+    db: AsyncSession = Depends(get_db),
+):
+    """Who decided what on this post, and when.
+
+    Readable by the post's author, so they can see why their post was held,
+    by staff of that post's college, and by an admin."""
+    admin_svc = PostAdminService(db)
+    return await admin_svc.moderation_history(actor, post_id)
 
 
 @router.patch("/{post_id}/moderation", response_model=ApiResponse[PostIdPayload])
 async def update_moderation_status(
     post_id: UUID,
     payload: ModerationUpdate,
-    moderator: User = Depends(get_moderator_user),
+    moderator: Actor = Depends(get_moderator_actor),
     db: AsyncSession = Depends(get_db),
 ):
     """Approve, hold or remove a post. Staff only.
 
-    Approving makes the post public; anything else keeps it hidden. The
-    decision is recorded against the moderator who made it."""
+    Approving makes the post public; anything else keeps it hidden. A
+    decision can be changed later -- staff may move a post between these
+    states at any time -- and every change is recorded against whoever made
+    it, with the note they left."""
     admin_svc = PostAdminService(db)
     updated_id = await admin_svc.update_moderation_status(
         post_id=post_id,
         moderation_status=payload.moderation_status,
         reviewer_id=moderator.id,
+        note=payload.note,
+        actor=moderator,
     )
     return success(
         f"Post marked {payload.moderation_status.value}",
@@ -313,7 +398,7 @@ async def update_moderation_status(
 async def delete_post_permanently(
     post_id: UUID,
     bg_tasks: BackgroundTasks,
-    _moderator: User = Depends(get_moderator_user),
+    moderator: Actor = Depends(get_moderator_actor),
     db: AsyncSession = Depends(get_db),
 ):
     """Permanently delete a post. Staff only.
@@ -322,7 +407,18 @@ async def delete_post_permanently(
     their own posts should use the delete action instead, which is reversible
     on our side."""
     admin_svc = PostAdminService(db)
-    public_ids = await admin_svc.delete_post(post_id, moderator_id=_moderator.id)
+
+    # A moderator may only take down their own campus's content; an admin
+    # may take down anyone's.
+    target = await admin_svc.post_repo.get_for_update(post_id)
+    if not target:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "post_not_found", "message": "Post not found"},
+        )
+    moderator.require(Permission.DELETE_ANY_POST, target.college_id)
+
+    public_ids = await admin_svc.delete_post(post_id, moderator_id=moderator.id)
 
     # The files leave the live folder but are kept, so a takedown can still be
     # reviewed after the fact.
@@ -337,7 +433,7 @@ async def delete_post_permanently(
 @router.post("/{post_id}/archive", response_model=ApiResponse[PostIdPayload])
 async def archive_post(
     post_id: UUID,
-    current_user: User = Depends(get_current_user),
+    actor: Actor = Depends(get_actor),
     db: AsyncSession = Depends(get_db),
 ):
     """Archive your own post.
@@ -345,14 +441,14 @@ async def archive_post(
     Takes the post out of public view without losing it; you can publish it
     again at any time."""
     post_svc = PostService(db)
-    updated_id = await post_svc.archive_post(post_id, current_user.id)
+    updated_id = await post_svc.archive_post(post_id, actor)
     return success("Post archived", post_id=updated_id)
 
 
 @router.post("/{post_id}/publish", response_model=ApiResponse[PostIdPayload])
 async def publish_post(
     post_id: UUID,
-    current_user: User = Depends(get_current_user),
+    actor: Actor = Depends(get_actor),
     db: AsyncSession = Depends(get_db),
 ):
     """Publish your own post again after archiving it.
@@ -360,14 +456,14 @@ async def publish_post(
     It becomes visible again as soon as it is published, provided a moderator
     has already approved it."""
     post_svc = PostService(db)
-    updated_id = await post_svc.publish_post(post_id, current_user.id)
+    updated_id = await post_svc.publish_post(post_id, actor)
     return success("Post published", post_id=updated_id)
 
 
 @router.post("/{post_id}/delete", response_model=ApiResponse[PostIdPayload])
 async def delete_post(
     post_id: UUID,
-    current_user: User = Depends(get_current_user),
+    actor: Actor = Depends(get_actor),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete your own post.
@@ -375,14 +471,14 @@ async def delete_post(
     Removes it from public view and from your listings. Only the author can
     delete their post."""
     post_svc = PostService(db)
-    updated_id = await post_svc.delete_post(post_id, current_user.id)
+    updated_id = await post_svc.delete_post(post_id, actor)
     return success("Post deleted", post_id=updated_id)
 
 
 @router.get("/{post_id}", response_model=Post)
 async def get_post(
     post_id: UUID,
-    user_id: UUID | None = Depends(get_current_user_id_optional),
+    actor: Actor = Depends(get_actor_optional),
     db: AsyncSession = Depends(get_db),
 ):
     """Fetch a single post with its author, media and your own reaction state.
@@ -390,9 +486,12 @@ async def get_post(
     Returns not found for posts that are not public, unless you are the
     author."""
     post_svc = PostService(db)
-    post = await post_svc.get_post(post_id, user_id)
+    post = await post_svc.get_post(post_id, actor)
     if not post:
-        raise HTTPException(status_code=404, detail="No post found")
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "post_not_found", "message": "Post not found"},
+        )
     return post
 
 

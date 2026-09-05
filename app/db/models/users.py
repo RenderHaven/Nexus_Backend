@@ -38,7 +38,19 @@ class User(Base):
     total_xp = Column(Integer, nullable=False, server_default="0", default=0)
     current_level = Column(Enum(IdentityLevel, name="identity_level"), nullable=False, server_default=IdentityLevel.spark.value, default=IdentityLevel.spark)
     profile = Column(JSONB, nullable=False, server_default=text("'{}'::jsonb"), default=dict)
+
+    # A deactivated account cannot sign in and its posts are pulled out of the
+    # pools and the search index. Reversible -- this is the safe alternative
+    # to deleting someone.
+    is_active = Column(Boolean, nullable=False, server_default="true", default=True, index=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=True,
+    )
 
     college = relationship("College", back_populates="users")
     interests = relationship("UserInterest", back_populates="user", cascade="all, delete-orphan")

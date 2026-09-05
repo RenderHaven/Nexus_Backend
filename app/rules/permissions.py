@@ -32,10 +32,15 @@ class Permission(StrEnum):
 
     # Users
     CREATE_USER = "create_user"
+    MANAGE_USER = "manage_user"
+    DELETE_USER = "delete_user"
+    RESET_PASSWORD = "reset_password"
 
     # Colleges
     CREATE_COLLEGE = "create_college"
     EDIT_COLLEGE = "edit_college"
+    DELETE_COLLEGE = "delete_college"
+    VIEW_COLLEGE_STATS = "view_college_stats"
 
 
 PERMISSIONS: dict[Permission, frozenset[UserRole]] = {
@@ -43,8 +48,13 @@ PERMISSIONS: dict[Permission, frozenset[UserRole]] = {
     Permission.MODERATE_POST: STAFF_ROLES,
     Permission.DELETE_ANY_POST: STAFF_ROLES,
     Permission.CREATE_USER: STAFF_ROLES,
+    Permission.MANAGE_USER: STAFF_ROLES,
+    Permission.DELETE_USER: PLATFORM_ROLES,
+    Permission.RESET_PASSWORD: PLATFORM_ROLES,
     Permission.CREATE_COLLEGE: PLATFORM_ROLES,
     Permission.EDIT_COLLEGE: STAFF_ROLES,
+    Permission.DELETE_COLLEGE: PLATFORM_ROLES,
+    Permission.VIEW_COLLEGE_STATS: STAFF_ROLES,
 }
 
 # Permissions a college-scoped role may only exercise on their own college.
@@ -52,7 +62,15 @@ PERMISSIONS: dict[Permission, frozenset[UserRole]] = {
 COLLEGE_SCOPED: frozenset[Permission] = frozenset(
     {
         Permission.CREATE_USER,
+        Permission.MANAGE_USER,
         Permission.EDIT_COLLEGE,
+        # Staff review and take down content on their own campus. Without
+        # these three listed here, require_college_permission would wave a
+        # moderator through against any college.
+        Permission.MODERATE_POST,
+        Permission.DELETE_ANY_POST,
+        Permission.CREATE_RESTRICTED_POST,
+        Permission.VIEW_COLLEGE_STATS,
     }
 )
 

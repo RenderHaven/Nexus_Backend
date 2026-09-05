@@ -5,6 +5,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     REDIS_URL: str
 
+    # Optional: with no cluster configured the app still boots and every
+    # non-search route works, so search can be added per environment.
+    OPENSEARCH_URL: str | None = None
+    OPENSEARCH_INDEX_PREFIX: str = ""
+    OPENSEARCH_VERIFY_CERTS: bool = True
+    OPENSEARCH_TIMEOUT: int = 10
+
     KAFKA_BOOTSTRAP_SERVERS: str | None = None
     KAFKA_INTERACTIONS_TOPIC: str = "interactions_topic"
     KAFKA_COMMENTS_TOPIC: str = "comments_topic"

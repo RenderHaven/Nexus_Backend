@@ -141,16 +141,23 @@ class FeedService:
     async def get_posts(
         self,
         grp_name: str,
-        user_id: UUID | None = None,
+        actor=None,
         cursor_key: str | None = None,
     ):
         """
         Get hydrated posts from the normal feed.
+
+        The actor picks the pool (their preferences) and decides what comes
+        back hydrated; the pools only ever hold public posts, so this is the
+        same set for everyone who can see the feed.
         """
+        from app.rules import Actor
+
+        actor = actor or Actor()
 
         pool_members, new_cursor_key = await self.get_pool_members(
             grp_name,
-            user_id,
+            actor.id,
             cursor_key,
         )
 
@@ -160,7 +167,7 @@ class FeedService:
         ids_only = [m.id for m in pool_members]
         posts = await self.post_svc.get_posts(
             ids_only,
-            user_id,
+            actor,
         )
 
         return posts, new_cursor_key

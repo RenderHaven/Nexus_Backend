@@ -1,11 +1,41 @@
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field, AliasChoices
+from enum import StrEnum
+
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+)
 from app.config import settings
-from app.db.models import PostType, PostStatus, ModerationStatus, ActionStatus, MediaType,CollaborationRequestStatus
+from app.db.models import (
+    ActionStatus,
+    CollaborationRequestStatus,
+    MediaType,
+    ModerationAction,
+    ModerationStatus,
+    PostStatus,
+    PostType,
+)
 from app.domains.pool.schemas import PoolMember, PoolObject
 from app.domains.user.schemas import UserBasic
 from app.schemas.common import Category, College
+
+class ModerationSort(StrEnum):
+    """Sortable columns on the moderation queue. Anything not listed here
+    cannot reach the ORDER BY, so the column name is never caller-supplied."""
+
+    created_at = "created_at"
+    reviewed_at = "reviewed_at"
+    engagement = "engagement"
+
+
+class SortOrder(StrEnum):
+    asc = "asc"
+    desc = "desc"
+
 
 class PostResource(BaseModel):
     title: str
@@ -127,6 +157,9 @@ class PostBasic(BaseModel):
     comment_count: int = 0
     created_at: datetime
     author: UserBasic | None = None
+    # Only filled when the caller is signed in; a card in a search result
+    # shows like state the same way a feed card does.
+    is_liked: bool | None = None
 
 
 class PostSummary(BaseModel):
@@ -138,8 +171,113 @@ class PostSummary(BaseModel):
     engagement_score: float
     is_active: bool
 
-class ModerationUpdate(BaseModel):
+# ----------------------------------------------------------------------
+# Moderation
+#
+# A decision is always one of approved / hold / removed. pending is the state
+# a post starts in and returns to when its author edits it -- it is never a
+# moderator's choice, so it is not offered here.
+# ----------------------------------------------------------------------
+
+DECIDABLE_STATUSES: frozenset[ModerationStatus] = frozenset(
+    {
+        ModerationStatus.approved,
+        ModerationStatus.hold,
+        ModerationStatus.removed,
+    }
+)
+
+
+class ModerationDecision(BaseModel):
+    """A moderator's verdict, shared by the single and bulk paths."""
+
     moderation_status: ModerationStatus
+    note: str | None = Field(
+        default=None,
+        max_length=settings.MAX_BODY_LENGTH,
+        description="Why. Recorded in the audit trail and shown to the author.",
+    )
+
+    @field_validator("moderation_status")
+    @classmethod
+    def _must_be_a_decision(cls, value: ModerationStatus) -> ModerationStatus:
+        if value not in DECIDABLE_STATUSES:
+            allowed = ", ".join(sorted(s.value for s in DECIDABLE_STATUSES))
+            raise ValueError(f"moderation_status must be one of: {allowed}")
+        return value
+
+
+class ModerationUpdate(ModerationDecision):
+    """One post. Kept as its own name because the route already used it."""
+
+
+class BulkModerationUpdate(ModerationDecision):
+    post_ids: list[UUID] = Field(
+        ...,
+        min_length=1,
+        max_length=settings.MAX_BATCH_SIZE,
+    )
+
+
+class BulkModerationFailure(BaseModel):
+    post_id: UUID
+    reason: str
+
+
+class BulkModerationResult(BaseModel):
+    """
+    One bad id does not fail the batch -- the moderator gets told which rows
+    went through and which did not.
+    """
+
+    updated: list[UUID] = Field(default_factory=list)
+    failed: list[BulkModerationFailure] = Field(default_factory=list)
+
+
+class ModerationCounts(BaseModel):
+    """Tab badges. One grouped count, not four."""
+
+    pending: int = 0
+    approved: int = 0
+    hold: int = 0
+    removed: int = 0
+
+
+class ModerationLogEntry(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    post_id: UUID
+    action: ModerationAction
+    note: str | None = None
+    created_at: datetime
+    moderator: UserBasic | None = Field(
+        default=None,
+        validation_alias=AliasChoices("moderator", "coach"),
+    )
+
+
+class ModerationQueueFilters(BaseModel):
+    """
+    Everything the queue table can narrow by.
+
+    Declared once and taken as a query-param model so the filter list is not
+    copy-pasted across the listing and count routes.
+
+    college_id is what the caller *asked* for. It is never trusted: the
+    service runs it through Actor.scope_college, which substitutes the
+    caller's own college unless they are an admin.
+    """
+
+    college_id: UUID | None = None
+    user_id: UUID | None = None
+    category_id: UUID | None = None
+    type: PostType | None = None
+    q: str | None = Field(default=None, max_length=settings.MAX_TITLE_LENGTH)
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+    sort: ModerationSort = ModerationSort.created_at
+    order: SortOrder = SortOrder.asc
 
 
 class PostIdPayload(BaseModel):
