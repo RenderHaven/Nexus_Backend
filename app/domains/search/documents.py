@@ -25,7 +25,7 @@ def _enum(value) -> str | None:
 def post_document(row) -> dict[str, Any]:
     return {
         "title": row.title,
-        "content": row.content,
+        "tags": getattr(row, "tags", []),
         "user_id": str(row.user_id),
         "college_id": str(row.college_id) if row.college_id else None,
         "category_id": str(row.category_id) if row.category_id else None,

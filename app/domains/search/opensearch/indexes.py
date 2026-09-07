@@ -77,7 +77,7 @@ MAPPINGS: dict[str, dict] = {
         "mappings": {
             "properties": {
                 "title": {"type": "text", "analyzer": "english"},
-                "content": {"type": "text", "analyzer": "english"},
+                "tags": {"type": "text", "analyzer": "english"},
                 # No author_username: nothing about a user is denormalised
                 # into a post, so a rename never has to fan out here. The
                 # trade is that a post cannot be found by its author's name --

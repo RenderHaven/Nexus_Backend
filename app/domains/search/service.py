@@ -260,7 +260,7 @@ class SearchService:
                             {
                                 "multi_match": {
                                     "query": query,
-                                    "fields": ["title^3", "content"],
+                                    "fields": ["title^3", "tags"],
                                     "fuzziness": "AUTO",
                                 }
                             }

@@ -2070,6 +2070,357 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | `201` | Successful Response | `Message` |
 | `422` | Validation Error | `HTTPValidationError` |
 
+### `GET /admin/infra/cache/health`
+
+**Cache Health**
+
+Reachability, memory in use, evictions and uptime.
+
+Returns 200 with reachable=false when Redis is down, rather than an error: the screen needs to render the outage, not inherit it.
+
+- **Operation ID:** `cache_health_admin_infra_cache_health_get`
+- **Authentication:** Required
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `CacheHealth` |
+
+### `GET /admin/infra/cache/hit_rate`
+
+**Cache Hit Rate**
+
+Hits against misses over time, server-wide and per key namespace.
+
+The server-wide pair is Redis's own counter and covers every key it has been asked for since it started. The per-namespace pair is ours, recorded by the entity caches as they read, and covers only those.
+
+- **Operation ID:** `cache_hit_rate_admin_infra_cache_hit_rate_get`
+- **Authentication:** Required
+
+#### Parameters
+
+| Name | In | Type | Required | Default |
+| --- | --- | --- | --- | --- |
+| `hours` | `query` | integer | No | `24` |
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `HitRate` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+### `GET /admin/infra/cache/keyspace`
+
+**Cache Keyspace**
+
+Key counts and sampled TTL/size per namespace.
+
+A bounded SCAN -- `truncated` says whether it stopped early, in which case the counts are a floor.
+
+- **Operation ID:** `cache_keyspace_admin_infra_cache_keyspace_get`
+- **Authentication:** Required
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `KeyspaceReport` |
+
+### `GET /admin/infra/cache/key`
+
+**Cache Key**
+
+Look up one key and see what is actually stored: type, TTL, size and a truncated preview of the value.
+
+Taken as a query parameter rather than a path segment because cache keys contain colons and slashes.
+
+- **Operation ID:** `cache_key_admin_infra_cache_key_get`
+- **Authentication:** Required
+
+#### Parameters
+
+| Name | In | Type | Required | Default |
+| --- | --- | --- | --- | --- |
+| `key` | `query` | string | Yes | — |
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `KeyInspection` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+### `DELETE /admin/infra/cache/key`
+
+**Invalidate Cache Key**
+
+Drop one key. The next read reloads it from Postgres.
+
+- **Operation ID:** `invalidate_cache_key_admin_infra_cache_key_delete`
+- **Authentication:** Required
+
+#### Parameters
+
+| Name | In | Type | Required | Default |
+| --- | --- | --- | --- | --- |
+| `key` | `query` | string | Yes | — |
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `InvalidationResult` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+### `GET /admin/infra/cache/ttl_policy`
+
+**Cache Ttl Policy**
+
+What each namespace is declared to expire after, next to what its live keys say. The disagreement column is the point.
+
+- **Operation ID:** `cache_ttl_policy_admin_infra_cache_ttl_policy_get`
+- **Authentication:** Required
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `TTLPolicy` |
+
+### `DELETE /admin/infra/cache/namespace/{namespace}`
+
+**Invalidate Cache Namespace**
+
+Drop every key in one namespace.
+
+The namespace must be one named in app/redis/namespaces.py, so no caller can pass a pattern that sweeps the whole keyspace. Deleting is safe by construction -- every read path treats a miss as "load from Postgres" -- but it is not free: a busted post namespace means the next feed page is served entirely from the database.
+
+- **Operation ID:** `invalidate_cache_namespace_admin_infra_cache_namespace__namespace__delete`
+- **Authentication:** Required
+
+#### Parameters
+
+| Name | In | Type | Required | Default |
+| --- | --- | --- | --- | --- |
+| `namespace` | `path` | string | Yes | — |
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `InvalidationResult` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+### `GET /admin/infra/search/health`
+
+**Search Health**
+
+Cluster status, shard state and document counts per index.
+
+`configured: false` when OPENSEARCH_URL is unset -- a supported way to run this app, so it is reported as a state rather than an error.
+
+- **Operation ID:** `search_health_admin_infra_search_health_get`
+- **Authentication:** Required
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `SearchHealth` |
+
+### `GET /admin/infra/search/ingest_lag`
+
+**Search Ingest Lag**
+
+How far each index trails its source table.
+
+A negative drift is the one to worry about: it means the index holds documents the database no longer has, which is a failed delete leaving removed content searchable.
+
+- **Operation ID:** `search_ingest_lag_admin_infra_search_ingest_lag_get`
+- **Authentication:** Required
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `IngestLag` |
+
+### `GET /admin/infra/search/mappings`
+
+**Search Mappings**
+
+What each field is indexed as and how text is tokenised, with the live mapping compared against the one in opensearch/indexes.py. A drift there means a rebuild is owed.
+
+- **Operation ID:** `search_mappings_admin_infra_search_mappings_get`
+- **Authentication:** Required
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `MappingReport` |
+
+### `GET /admin/infra/search/query`
+
+**Search Query**
+
+Run a query and see the raw hits and scores behind a result.
+
+Unfiltered on purpose: this shows what the index holds, not what the public endpoint would return.
+
+- **Operation ID:** `search_query_admin_infra_search_query_get`
+- **Authentication:** Required
+
+#### Parameters
+
+| Name | In | Type | Required | Default |
+| --- | --- | --- | --- | --- |
+| `index` | `query` | string | Yes | — |
+| `q` | `query` | string | Yes | — |
+| `size` | `query` | integer | No | `10` |
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `QueryResult` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+### `GET /admin/infra/search/reindex`
+
+**Search Reindex Status**
+
+The state of the most recent rebuild of each index.
+
+- **Operation ID:** `search_reindex_status_admin_infra_search_reindex_get`
+- **Authentication:** Required
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `ReindexReport` |
+
+### `POST /admin/infra/search/reindex/{index}`
+
+**Start Search Reindex**
+
+Rebuild one index from Postgres.
+
+Returns 202 immediately and runs in the background -- a full rebuild walks every row of the source table, well past any HTTP timeout. Poll GET /infra/search/reindex for the outcome.
+
+Safe while search is live: the rebuild fills a fresh version alongside the current one and only swaps the alias once the new index holds everything that was read.
+
+- **Operation ID:** `start_search_reindex_admin_infra_search_reindex__index__post`
+- **Authentication:** Required
+
+#### Parameters
+
+| Name | In | Type | Required | Default |
+| --- | --- | --- | --- | --- |
+| `index` | `path` | string | Yes | — |
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `202` | Successful Response | `ReindexState` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+### `GET /admin/infra/database/pool`
+
+**Database Pool**
+
+Open connections, waiters and pool saturation.
+
+Two pools side by side: SQLAlchemy's, which is what a request waits on, and the server's from pg_stat_activity, which counts every connection Postgres has and is the one that runs out first.
+
+- **Operation ID:** `database_pool_admin_infra_database_pool_get`
+- **Authentication:** Required
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `ConnectionPool` |
+
+### `GET /admin/infra/database/tables`
+
+**Database Tables**
+
+Row counts and on-disk size per table, largest first.
+
+Counts are the statistics collector's estimate, not SELECT count(*) -- exact counts would be one sequential scan per table per page view.
+
+- **Operation ID:** `database_tables_admin_infra_database_tables_get`
+- **Authentication:** Required
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `TableReport` |
+
+### `GET /admin/infra/database/migrations`
+
+**Database Migrations**
+
+Which migrations are applied.
+
+There is no revision ledger in this project -- migrations are idempotent scripts under app/scripts/ and nothing records which have run. Each is checked against the live schema instead, so `applied` means the effect is present rather than that someone wrote down that they ran it.
+
+- **Operation ID:** `database_migrations_admin_infra_database_migrations_get`
+- **Authentication:** Required
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `MigrationReport` |
+
+### `GET /admin/infra/database/slow_queries`
+
+**Database Slow Queries**
+
+The statements costing the most total time, from pg_stat_statements.
+
+Ordered by total time, not mean: a 5ms query run a million times is a bigger problem than a 5s query run twice. When the extension is not installed the response says so rather than returning an empty list that reads like "nothing is slow".
+
+- **Operation ID:** `database_slow_queries_admin_infra_database_slow_queries_get`
+- **Authentication:** Required
+
+#### Parameters
+
+| Name | In | Type | Required | Default |
+| --- | --- | --- | --- | --- |
+| `limit` | `query` | integer | No | `20` |
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `SlowQueryReport` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+### `GET /admin/infra/database/backups`
+
+**Database Backups**
+
+When the last backup ran and whether it succeeded.
+
+Only WAL archiving is visible from inside Postgres, so a negative here means "nothing this database knows about", not that no backups exist.
+
+- **Operation ID:** `database_backups_admin_infra_database_backups_get`
+- **Authentication:** Required
+
+#### Responses
+
+| Status | Description | Response Schema |
+| --- | --- | --- |
+| `200` | Successful Response | `BackupStatus` |
+
 ### `GET /`
 
 **Root**
@@ -2169,6 +2520,21 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | `message` | string/null | No | — |
 | `payload` | `UserIdPayload`/null | No | — |
 
+### `BackupStatus`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `configured` | boolean | No | `false` |
+| `summary` | string/null | No | — |
+| `archive_mode` | string/null | No | — |
+| `archive_command` | string/null | No | — |
+| `archived_count` | integer/null | No | — |
+| `last_archived_at` | string (date-time)/null | No | — |
+| `failed_count` | integer/null | No | — |
+| `last_failed_at` | string (date-time)/null | No | — |
+| `stats_reset` | string (date-time)/null | No | — |
+| `healthy` | boolean/null | No | — |
+
 ### `Banner`
 
 | Field | Type | Required | Default / Constraints |
@@ -2257,6 +2623,27 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | --- | --- | --- | --- |
 | `updated` | array of string (uuid) | No | — |
 | `failed` | array of `BulkUserFailure` | No | — |
+
+### `CacheHealth`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `reachable` | boolean | No | `false` |
+| `error` | string/null | No | — |
+| `latency_ms` | number/null | No | — |
+| `version` | string/null | No | — |
+| `mode` | string/null | No | — |
+| `uptime_seconds` | integer/null | No | — |
+| `memory_used_bytes` | integer/null | No | — |
+| `memory_used_human` | string/null | No | — |
+| `memory_peak_bytes` | integer/null | No | — |
+| `maxmemory_bytes` | integer/null | No | — |
+| `maxmemory_policy` | string/null | No | — |
+| `memory_used_percent` | number/null | No | — |
+| `evicted_keys` | integer/null | No | — |
+| `expired_keys` | integer/null | No | — |
+| `connected_clients` | integer/null | No | — |
+| `total_keys` | integer/null | No | — |
 
 ### `Category`
 
@@ -2420,6 +2807,7 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | `is_active` | boolean | No | `true` |
 | `created_at` | string (date-time)/null | No | — |
 | `updated_at` | string (date-time)/null | No | — |
+| `author` | `UserMini`/null | No | — |
 
 ### `CommentDeletedPayload`
 
@@ -2445,6 +2833,29 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | Field | Type | Required | Default / Constraints |
 | --- | --- | --- | --- |
 | `comment` | string | Yes | — |
+
+### `ConnectionPool`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `reachable` | boolean | No | `false` |
+| `error` | string/null | No | — |
+| `version` | string/null | No | — |
+| `database` | string/null | No | — |
+| `uptime_seconds` | integer/null | No | — |
+| `latency_ms` | number/null | No | — |
+| `pool_size` | integer/null | No | — |
+| `checked_out` | integer/null | No | — |
+| `checked_in` | integer/null | No | — |
+| `overflow` | integer/null | No | — |
+| `max_overflow` | integer/null | No | — |
+| `pool_saturation_percent` | number/null | No | — |
+| `server_connections` | integer/null | No | — |
+| `server_max_connections` | integer/null | No | — |
+| `server_saturation_percent` | number/null | No | — |
+| `by_state` | object | No | — |
+| `idle_in_transaction` | integer | No | `0` |
+| `longest_query_seconds` | number/null | No | — |
 
 ### `ConversationStatus`
 
@@ -2474,11 +2885,40 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | `end_date` | string (date)/null | No | — |
 | `is_current` | boolean | No | `false` |
 
+### `FieldMapping`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `field` | string | Yes | — |
+| `type` | string/null | No | — |
+| `analyzer` | string/null | No | — |
+| `search_analyzer` | string/null | No | — |
+| `subfields` | array of string | No | — |
+
 ### `HTTPValidationError`
 
 | Field | Type | Required | Default / Constraints |
 | --- | --- | --- | --- |
 | `detail` | array of `ValidationError` | No | — |
+
+### `HitRate`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `server_hits` | integer | No | `0` |
+| `server_misses` | integer | No | `0` |
+| `server_hit_rate` | number/null | No | — |
+| `by_namespace` | array of `NamespaceHitRate` | No | — |
+| `series` | array of `NamespaceSeries` | No | — |
+| `hours` | integer | No | `24` |
+
+### `HitRateBucket`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `hour` | string (date-time) | Yes | — |
+| `hits` | integer | No | `0` |
+| `misses` | integer | No | `0` |
 
 ### `IdentityLevel`
 
@@ -2491,6 +2931,57 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 - `horizon`
 - `constellation`
 
+### `IndexHealth`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `name` | string | Yes | — |
+| `alias` | string | Yes | — |
+| `physical` | string/null | No | — |
+| `version` | integer/null | No | — |
+| `exists` | boolean | No | `false` |
+| `status` | string/null | No | — |
+| `documents` | integer | No | `0` |
+| `deleted_documents` | integer | No | `0` |
+| `size_bytes` | integer/null | No | — |
+| `shards` | integer/null | No | — |
+| `replicas` | integer/null | No | — |
+| `unassigned_shards` | integer/null | No | — |
+
+### `IndexLag`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `index` | string | Yes | — |
+| `source` | string | Yes | — |
+| `database_rows` | integer | No | `0` |
+| `indexed_documents` | integer | No | `0` |
+| `drift` | integer | No | `0` |
+| `in_sync` | boolean | No | `true` |
+
+### `IndexMapping`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `index` | string | Yes | — |
+| `physical` | string/null | No | — |
+| `fields` | array of `FieldMapping` | No | — |
+| `analyzers` | object | No | — |
+| `tokenizers` | object | No | — |
+| `drifted` | boolean | No | `false` |
+| `drift` | array of string | No | — |
+
+### `IngestLag`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `configured` | boolean | No | `false` |
+| `reachable` | boolean | No | `false` |
+| `error` | string/null | No | — |
+| `queued` | integer | No | `0` |
+| `queue_note` | string/null | No | — |
+| `indexes` | array of `IndexLag` | No | — |
+
 ### `Interval`
 
 **Enum values:**
@@ -2498,6 +2989,15 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 - `day`
 - `week`
 - `month`
+
+### `InvalidationResult`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `target` | string | Yes | — |
+| `deleted` | integer | No | `0` |
+| `scanned` | integer | No | `0` |
+| `truncated` | boolean | No | `false` |
 
 ### `JourneyMilestone`
 
@@ -2507,6 +3007,39 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | `description` | string/null | No | — |
 | `date` | string (date) | Yes | — |
 | `icon` | string/null | No | — |
+
+### `KeyInspection`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `key` | string | Yes | — |
+| `exists` | boolean | No | `false` |
+| `namespace` | string/null | No | — |
+| `type` | string/null | No | — |
+| `ttl_seconds` | integer/null | No | — |
+| `has_ttl` | boolean | No | `false` |
+| `size_bytes` | integer/null | No | — |
+| `length` | integer/null | No | — |
+| `preview` | string/null | No | — |
+| `truncated_preview` | boolean | No | `false` |
+
+### `KeyspaceReport`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `total_keys` | integer | No | `0` |
+| `scanned_keys` | integer | No | `0` |
+| `truncated` | boolean | No | `false` |
+| `namespaces` | array of `NamespaceStat` | No | — |
+
+### `MappingReport`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `configured` | boolean | No | `false` |
+| `reachable` | boolean | No | `false` |
+| `error` | string/null | No | — |
+| `indexes` | array of `IndexMapping` | No | — |
 
 ### `MediaType`
 
@@ -2526,6 +3059,7 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | `body` | string/null | No | — |
 | `type` | `MessageType` | Yes | — |
 | `created_at` | string (date-time) | Yes | — |
+| `author` | `UserMini`/null | No | — |
 
 ### `MessagePoolMember`
 
@@ -2537,6 +3071,7 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | `body` | string/null | No | — |
 | `type` | `MessageType` | Yes | — |
 | `created_at` | string (date-time) | Yes | — |
+| `author` | `UserMini`/null | No | — |
 
 ### `MessageType`
 
@@ -2545,6 +3080,30 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 - `text`
 - `link`
 - `file`
+
+### `MigrationReport`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `reachable` | boolean | No | `false` |
+| `error` | string/null | No | — |
+| `uses_revision_ledger` | boolean | No | `false` |
+| `applied` | integer | No | `0` |
+| `pending` | integer | No | `0` |
+| `migrations` | array of `MigrationStatus` | No | — |
+
+### `MigrationStatus`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `script` | string | Yes | — |
+| `title` | string | Yes | — |
+| `description` | string | Yes | — |
+| `applied` | boolean | No | `false` |
+| `missing_columns` | array of string | No | — |
+| `missing_indexes` | array of string | No | — |
+| `violations` | integer/null | No | — |
+| `violations_label` | string/null | No | — |
 
 ### `ModerationAction`
 
@@ -2572,6 +3131,7 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | `action` | `ModerationAction` | Yes | — |
 | `note` | string/null | No | — |
 | `created_at` | string (date-time) | Yes | — |
+| `moderator_id` | string (uuid) | Yes | — |
 | `moderator` | `UserBasic`/null | No | — |
 
 ### `ModerationSort`
@@ -2626,6 +3186,42 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | `college_id` | string (uuid)/null | No | — |
 | `is_platform_wide` | boolean | No | `false` |
 | `permissions` | array of string | No | — |
+
+### `NamespaceHitRate`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `namespace` | string | Yes | — |
+| `label` | string | Yes | — |
+| `hits` | integer | No | `0` |
+| `misses` | integer | No | `0` |
+| `hit_rate` | number/null | No | — |
+| `instrumented` | boolean | No | `true` |
+
+### `NamespaceSeries`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `namespace` | string | Yes | — |
+| `label` | string | Yes | — |
+| `buckets` | array of `HitRateBucket` | No | — |
+
+### `NamespaceStat`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `namespace` | string | Yes | — |
+| `label` | string | Yes | — |
+| `pattern` | string | Yes | — |
+| `description` | string | Yes | — |
+| `keys` | integer | No | `0` |
+| `declared_ttl_seconds` | integer/null | No | — |
+| `ttl_note` | string/null | No | — |
+| `sampled_keys` | integer | No | `0` |
+| `without_ttl` | integer | No | `0` |
+| `min_ttl_seconds` | integer/null | No | — |
+| `max_ttl_seconds` | integer/null | No | — |
+| `sampled_bytes` | integer/null | No | — |
 
 ### `NewsItem`
 
@@ -2849,6 +3445,27 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | `link` | string/null | No | — |
 | `tech_stack` | array of string/null | No | — |
 
+### `QueryHit`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `id` | string | Yes | — |
+| `score` | number/null | No | — |
+| `source` | object | No | — |
+
+### `QueryResult`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `index` | string | Yes | — |
+| `query` | string | Yes | — |
+| `took_ms` | integer/null | No | — |
+| `total` | integer | No | `0` |
+| `max_score` | number/null | No | — |
+| `hits` | array of `QueryHit` | No | — |
+| `error` | string/null | No | — |
+| `note` | string/null | No | — |
+
 ### `ReactionAction`
 
 **Enum values:**
@@ -2864,6 +3481,39 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | `action` | `ReactionAction` | Yes | — |
 | `post_id` | string (uuid) | Yes | — |
 | `user_id` | string (uuid) | Yes | — |
+
+### `ReindexReport`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `indexes` | array of `ReindexState` | No | — |
+
+### `ReindexState`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `index` | string | Yes | — |
+| `status` | string | No | `idle` |
+| `started_at` | string (date-time)/null | No | — |
+| `finished_at` | string (date-time)/null | No | — |
+| `duration_seconds` | number/null | No | — |
+| `error` | string/null | No | — |
+| `triggered_by` | string/null | No | — |
+
+### `SearchHealth`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `configured` | boolean | No | `false` |
+| `reachable` | boolean | No | `false` |
+| `error` | string/null | No | — |
+| `cluster_name` | string/null | No | — |
+| `version` | string/null | No | — |
+| `status` | string/null | No | — |
+| `nodes` | integer/null | No | — |
+| `active_shards` | integer/null | No | — |
+| `unassigned_shards` | integer/null | No | — |
+| `indexes` | array of `IndexHealth` | No | — |
 
 ### `SearchResult`
 
@@ -2890,6 +3540,28 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 | `body` | string | Yes | — |
 | `type` | `MessageType` | No | `text` |
 
+### `SlowQuery`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `query` | string | Yes | — |
+| `calls` | integer | No | `0` |
+| `total_ms` | number | No | `0.0` |
+| `mean_ms` | number | No | `0.0` |
+| `max_ms` | number/null | No | — |
+| `rows` | integer | No | `0` |
+
+### `SlowQueryReport`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `available` | boolean | No | `false` |
+| `enabled` | boolean | No | `false` |
+| `reason` | string/null | No | — |
+| `how_to_enable` | string/null | No | — |
+| `stats_reset` | string (date-time)/null | No | — |
+| `queries` | array of `SlowQuery` | No | — |
+
 ### `SocialLink`
 
 | Field | Type | Required | Default / Constraints |
@@ -2913,6 +3585,53 @@ max_file_size is the largest file accepted, and max_media_count is how many file
 - `90d`
 - `1y`
 - `all`
+
+### `TTLPolicy`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `rows` | array of `TTLPolicyRow` | No | — |
+| `truncated` | boolean | No | `false` |
+
+### `TTLPolicyRow`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `namespace` | string | Yes | — |
+| `label` | string | Yes | — |
+| `pattern` | string | Yes | — |
+| `declared_ttl_seconds` | integer/null | No | — |
+| `ttl_note` | string/null | No | — |
+| `keys` | integer | No | `0` |
+| `without_ttl` | integer | No | `0` |
+| `max_ttl_seconds` | integer/null | No | — |
+| `disagrees` | boolean | No | `false` |
+| `disagreement` | string/null | No | — |
+
+### `TableReport`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `reachable` | boolean | No | `false` |
+| `error` | string/null | No | — |
+| `database_bytes` | integer/null | No | — |
+| `database_human` | string/null | No | — |
+| `tables` | array of `TableSize` | No | — |
+
+### `TableSize`
+
+| Field | Type | Required | Default / Constraints |
+| --- | --- | --- | --- |
+| `table` | string | Yes | — |
+| `estimated_rows` | integer | No | `0` |
+| `total_bytes` | integer | No | `0` |
+| `table_bytes` | integer | No | `0` |
+| `index_bytes` | integer | No | `0` |
+| `toast_bytes` | integer | No | `0` |
+| `total_human` | string/null | No | — |
+| `dead_rows` | integer | No | `0` |
+| `last_autovacuum` | string (date-time)/null | No | — |
+| `last_autoanalyze` | string (date-time)/null | No | — |
 
 ### `TempPasswordPayload`
 
